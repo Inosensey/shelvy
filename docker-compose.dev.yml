@@ -1,0 +1,38 @@
+# docker-compose.dev.yml
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./apps/api:/app/apps/api
+      - /app/node_modules
+      - /app/apps/api/node_modules
+    command: npm run dev:backend
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://backend:3001
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
+      - TURBOPACK_POLLING=true
+    volumes:
+      - ./apps/web:/app/apps/web
+      - /app/node_modules
+      - /app/apps/web/node_modules
+    command: npm run dev:frontend

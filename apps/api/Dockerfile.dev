@@ -1,0 +1,26 @@
+# Use a Debian-based image instead of Alpine
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY apps/api/package*.json ./apps/api/
+COPY turbo.json ./
+
+# Install dependencies
+RUN npm install --workspace=apps/api   
+
+# Install NestJS CLI globally for hot reload
+RUN npm install -g @nestjs/cli
+
+# Copy Prisma schema
+COPY apps/api/prisma ./apps/api/prisma
+
+# Generate Prisma client
+RUN npx prisma generate --schema=./apps/api/prisma/schema.prisma
+
+EXPOSE 3001
+
+# Default command (will be overridden by docker-compose)
+CMD ["npm", "run", "start:dev", "--workspace=apps/api"]
