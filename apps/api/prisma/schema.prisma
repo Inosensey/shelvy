@@ -13,19 +13,64 @@ datasource db {
   provider = "postgresql"
 }
 
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  userType  String    @default("user") @map("user_type")
-
-  sessions  Session[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  // relationships
+  users     User[]
+  products  Product[]
+  suppliers Supplier[]
 }
 
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String?  // nullable for OAuth users
+  avatar         String?
+  stripeCustomerId String @default("") @map("stripe_customer_id")
+  subscriptionPlan SubscriptionPlan @default(FREE)
+  role           Role     @default(STAFF)
+  authProvider   AuthProvider @default(LOCAL)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  stockMovements StockMovement[]
+  sessions       Session[]
+  users          UserInfo[]
+  subscriptions  Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime? @updatedAt
+}
+
+model UserInfo {
+  id          Int      @id @default(autoincrement())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+
+  firstName   String
+  middleName  String?
+  lastName    String
+  suffix      String?
+
+  birthDate   DateTime?
+  gender      String?
+
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
 model Session {
   id              String         @id @default(uuid())
@@ -45,4 +90,159 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@index([isValid])
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  userId    String             @unique @map("user_id") // unique because one user = one subscription
+  
+  // Stripe related
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id")
+  stripeCustomerId     String? @map("stripe_customer_id")
+  stripePriceId        String? @map("stripe_price_id")
+  
+  // Subscription details
+  plan               SubscriptionPlan   @default(FREE)
+  amount             Decimal            @default(0.0)
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime?          @map("current_period_start")
+  currentPeriodEnd   DateTime?          @map("current_period_end")
+  cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
+  
+  // Payment tracking
+  lastPaymentDate  DateTime? @map("last_payment_date")
+  nextPaymentDate  DateTime? @map("next_payment_date")
+  lastPaymentError String?   @map("last_payment_error")
+  failedAttempts   Int       @default(0) @map("failed_attempts")
+  
+  // Metadata
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  canceledAt DateTime? @map("canceled_at")
+  
+  // Relations
+  subscriptionPayments SubscriptionPaymentHistory[]
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("subscriptions")
+  @@index([status])
+  @@index([nextPaymentDate])
+}
+
+model SubscriptionPaymentHistory {
+  id             String        @id @default(cuid())
+  subscriptionId String        @map("subscription_id")
+
+  // Stripe info
+  stripeInvoiceId       String? @unique @map("stripe_invoice_id")
+  stripePaymentIntentId String? @map("stripe_payment_intent_id")
+
+  // Payment details
+  amount        Int                  // in cents, e.g. 2999 = $29.99
+  currency      String  @default("usd")
+  status        PaymentStatus @default(COMPLETED)
+  failureReason String? @map("failure_reason")
+
+  // Period this payment covers
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("subscription_payments_history")
+  @@index([subscriptionId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal
+  stock       Int      @default(0)
+  lowStockThreshold Int @default(5) // ← for low stock alerts
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+
+  stockMovements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id        String    @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  products  Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StockMovement {
+  id        String        @id @default(cuid())
+  type      MovementType  // IN, OUT, ADJUSTMENT
+  quantity  Int           // how many units moved
+  reason    String?       // why it happened
+  note      String?       // extra context
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  performedById String      // who did it
+  performedBy   User @relation(fields: [performedById], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// Enums
+enum PaymentStatus {
+  COMPLETED
+  FAILED
+  REFUNDED
+  PENDING
+}
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+  INCOMPLETE
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  GITHUB
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
 }
