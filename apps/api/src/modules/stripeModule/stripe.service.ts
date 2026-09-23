@@ -55,12 +55,14 @@ export class StripeService {
     data: createCheckoutDTO,
     plan: string,
     priceId: string,
+    userId: string,
   ) {
     const stripeCustomerId = await this.getOrCreateStripeCustomer(
       data.email,
-      data.userId,
+      userId,
     );
     const hashedPassword = await bcrypt.hash(data.password, 10);
+    const isLoggedIn = userId ? 'true' : 'false';
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [
@@ -71,13 +73,13 @@ export class StripeService {
       ],
       customer: stripeCustomerId,
       metadata: {
-        userId: data.userId ? data.userId : null,
+        userId: userId ? userId : null,
         email: data.email,
         password: hashedPassword,
         plan: plan,
       },
-      success_url: `${this.configService.get('FRONTEND_URL')}/subscription-payment/success?subscription_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.configService.get('FRONTEND_URL')}/subscription-payment/cancel`,
+      success_url: `${this.configService.get('FRONTEND_URL')}/subscription/success?subscription_id={CHECKOUT_SESSION_ID}&logged_in=${isLoggedIn}`,
+      cancel_url: `${this.configService.get('FRONTEND_URL')}/subscription/cancel`,
     });
 
     return { sessionId: session.id, url: session.url };
@@ -342,9 +344,6 @@ export class StripeService {
         existingUser = await this.authService.getUserById(userId);
       }
 
-      console.log('userId', userId);
-      console.log('existingUser', existingUser);
-
       if (existingUser) {
         await this.authService.updateUserStripeCustomerId(
           existingUser.id,
@@ -376,8 +375,6 @@ export class StripeService {
           password: password,
           role: Role.OWNER,
         };
-
-        console.log('userPayload', userPayload);
 
         const newUser: UserResponseDTO = await this.authService.createUser(
           userPayload,
