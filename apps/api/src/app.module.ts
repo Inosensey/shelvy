@@ -7,6 +7,7 @@ import { SubscriptionModule } from './modules/subscriptionModule/subscription.mo
 import { AuthModule } from './modules/authModule/auth.module';
 import { UserModule } from './modules/usersModule/user.module';
 import { ConfigModule } from '@nestjs/config';
+import { OrganizationModule } from './modules/organizationModule/organization.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ConfigModule } from '@nestjs/config';
     ConfigModule,
     AuthModule,
     UserModule,
+    OrganizationModule,
     StripeModule,
     SubscriptionModule,
   ],
