@@ -10,9 +10,6 @@ import {
 } from 'class-validator';
 
 export class createCheckoutDTO {
-  @ApiProperty({ example: 'usr_1234567890' })
-  userId?: string;
-
   @ApiProperty({
     example: 'john@example.com',
     description: 'Email address',
