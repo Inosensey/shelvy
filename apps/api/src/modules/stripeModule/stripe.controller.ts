@@ -6,6 +6,7 @@ import { createCheckoutDTO, verifyPaymentDTO } from './stripe.dto';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { PermissionsGuard } from 'src/guards/permission.guard';
 import { ConfigService } from '@nestjs/config';
+import type { AuthenticatedRequest } from 'src/types/request';
 @Controller('stripe')
 export class StripeController {
   constructor(
@@ -14,8 +15,12 @@ export class StripeController {
   ) {}
 
   @Post('create-subscription-checkout/premium')
-  async createSubscriptionCheckoutPremium(@Body() data: createCheckoutDTO) {
+  async createSubscriptionCheckoutPremium(
+    @Req() req: AuthenticatedRequest,
+    @Body() data: createCheckoutDTO,
+  ) {
     const plan = 'premium';
+    const userId = req.user?.userId;
     const priceId = this.configService.get<string>('STRIPE_PREMIUM_PRICE_ID');
     if (!priceId) {
       throw new Error('STRIPE_PREMIUM_PRICE_ID is not configured');
@@ -24,13 +29,18 @@ export class StripeController {
       data,
       plan,
       priceId,
+      userId,
     );
     return ApiResponse.success(session, 'Stripe Session Successfully Created');
   }
 
   @Post('create-subscription-checkout/enterprise')
-  async createSubscriptionCheckoutEnterprise(@Body() data: createCheckoutDTO) {
+  async createSubscriptionCheckoutEnterprise(
+    @Req() req: AuthenticatedRequest,
+    @Body() data: createCheckoutDTO,
+  ) {
     const plan = 'enterprise';
+    const userId = req.user?.userId;
     const priceId = this.configService.get<string>(
       'STRIPE_ENTERPRISE_PRICE_ID',
     );
@@ -41,6 +51,7 @@ export class StripeController {
       data,
       plan,
       priceId,
+      userId,
     );
     return ApiResponse.success(session, 'Stripe Session Successfully Created');
   }
