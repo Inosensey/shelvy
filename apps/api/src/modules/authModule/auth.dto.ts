@@ -6,7 +6,6 @@ import {
   MinLength,
   MaxLength,
   IsStrongPassword,
-  IsEnum,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -43,8 +42,8 @@ export class RegisterDTO {
   password!: string;
 
   @ApiProperty({ enum: SubscriptionPlan, example: SubscriptionPlan.PREMIUM })
-  @IsEnum(SubscriptionPlan, { message: 'Invalid plan selected.' })
-  @IsNotEmpty({ message: 'Plan is required.' })
+  // @IsEnum(SubscriptionPlan, { message: 'Invalid plan selected.' })
+  // @IsNotEmpty({ message: 'Plan is required.' })
   plan?: SubscriptionPlan;
 }
 
