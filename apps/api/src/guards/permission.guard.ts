@@ -35,17 +35,23 @@ export class PermissionsGuard implements CanActivate {
   private permissionStructures: PermissionStructure = {
     // User module permissions
     users: {
-      admin: ['CREATE', 'READ', 'UPDATE', 'DELETE', 'MANAGE_ROLES'],
-      user: ['CREATE', 'READ', 'UPDATE'],
+      OWNER: ['CREATE', 'READ', 'UPDATE', 'MANAGE_ROLES'],
+      MANAGER: ['CREATE', 'READ', 'UPDATE'],
+      STAFF: ['READ', 'UPDATE'],
+    },
+    organizations: {
+      OWNER: ['CREATE', 'READ', 'UPDATE', 'MANAGE_ROLES'],
     },
     products: {
-      admin: ['CREATE', 'READ', 'UPDATE', 'DELETE', 'MANAGE_ROLES'],
-      user: ['CREATE', 'READ', 'DELETE', 'UPDATE'],
+      OWNER: ['CREATE', 'READ', 'UPDATE', 'MANAGE_ROLES'],
+      MANAGER: ['CREATE', 'READ', 'UPDATE'],
+      STAFF: ['CREATE', 'READ', 'DELETE', 'UPDATE'],
     },
     // Default/fallback permissions
     default: {
-      admin: ['ALL'],
-      user: ['READ'],
+      OWNER: ['ALL'],
+      MANAGER: ['READ'],
+      STAFF: ['READ'],
     },
   };
 
