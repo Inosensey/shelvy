@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 
 // Services
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
+import { CreateUserInfoDTO, SaveOnboardingDTO } from './user.dto';
 
 @Injectable()
 export class UserRepository {
@@ -27,6 +28,12 @@ export class UserRepository {
     });
   }
 
+  async findUserInfoById(userId: string) {
+    return this.prisma.userInfo.findUniqueOrThrow({
+      where: { userId },
+    });
+  }
+
   async getStripeCustomerId(userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -46,6 +53,39 @@ export class UserRepository {
     return this.prisma.user.update({
       where: { id: userId },
       data: { stripeCustomerId },
+    });
+  }
+
+  async createUserInfo(data: CreateUserInfoDTO, userId: string) {
+    return this.prisma.userInfo.create({
+      data: {
+        ...data,
+        userId,
+      },
+    });
+  }
+
+  async saveOnboardingInfo(data: SaveOnboardingDTO, userId: string) {
+    return this.prisma.$transaction(async (prisma) => {
+      // Create user info
+      const userInfo = await prisma.userInfo.create({
+        data: {
+          userId,
+          ...data.userInfo,
+        },
+      });
+
+      const organization = await prisma.organization.create({
+        data: {
+          ownerId: userId,
+          ...data.organization,
+          users: {
+            connect: { id: userId },
+          },
+        },
+      });
+
+      return { userInfo, organization };
     });
   }
 }
