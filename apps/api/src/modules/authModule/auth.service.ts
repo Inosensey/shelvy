@@ -80,7 +80,7 @@ export class AuthService {
     await this.session.invalidateAllUserSessions(user.id);
 
     // Create JWT token
-    const token = this.generateJwtToken(user.id, 'user');
+    const token = this.generateJwtToken(user.id, user.role);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -91,7 +91,7 @@ export class AuthService {
       token,
       userId: user.id,
       email: user.email,
-      userType: 'user',
+      userType: user.role,
     };
   }
 
