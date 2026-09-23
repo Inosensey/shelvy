@@ -66,7 +66,7 @@ export class AuthController {
     user: RegisterDTO,
   ) {
     if (user.plan && user.plan !== SubscriptionPlan.FREE) {
-      return ApiResponseShaper.error(null, 'Invalid plan selected');
+      user.plan = SubscriptionPlan.FREE;
     }
     const result = await this.authService.createUser(user);
     return ApiResponseShaper.success(result, 'User created successfully');
@@ -106,7 +106,7 @@ export class AuthController {
         email: result.email,
         userType: result.userType,
       },
-      'User signed in successfully',
+      'Signed in successfully. Connecting to Dashboard...',
     );
   }
 
