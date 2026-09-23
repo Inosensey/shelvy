@@ -14,38 +14,49 @@ datasource db {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  ownerId     String   @unique
+  name        String
+  description String?
 
-  // relationships
-  users     User[]
-  products  Product[]
-  suppliers Supplier[]
+  // Owner relationship
+  owner       User     @relation("OrganizationOwner", fields: [ownerId], references: [id])
+
+  // Members
+  users       User[]   @relation("OrganizationMembers")
+
+  products    Product[]
+  suppliers   Supplier[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  password       String?  // nullable for OAuth users
-  avatar         String?
-  stripeCustomerId String @default("") @map("stripe_customer_id")
-  subscriptionPlan SubscriptionPlan @default(FREE)
-  role           Role     @default(STAFF)
-  authProvider   AuthProvider @default(LOCAL)
+  id                String   @id @default(cuid())
+  email             String   @unique
+  password          String?
+  avatar            String?
 
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  stripeCustomerId  String   @default("") @map("stripe_customer_id")
+  subscriptionPlan  SubscriptionPlan @default(FREE)
+  role              Role     @default(STAFF)
+  authProvider      AuthProvider @default(LOCAL)
 
-  stockMovements StockMovement[]
-  sessions       Session[]
-  users          UserInfo[]
-  subscriptions  Subscription[]
+  // Organization the user belongs to
+  organizationId    String?
+  organization      Organization? @relation("OrganizationMembers", fields: [organizationId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime? @updatedAt
+  // Organization owned by this user
+  ownedOrganization Organization? @relation("OrganizationOwner")
+
+  stockMovements    StockMovement[]
+  sessions          Session[]
+  users             UserInfo[]
+  subscriptions     Subscription[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime? @updatedAt
 }
 
 model UserInfo {
