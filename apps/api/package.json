@@ -83,6 +83,14 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/../jest.setup.ts"
+    ],
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1",
+      "^generated/prisma/client$": "<rootDir>/__mocks__/prisma.mock.ts",
+      "^generated/(.*)$": "<rootDir>/../generated/$1"
+    }
   }
 }
