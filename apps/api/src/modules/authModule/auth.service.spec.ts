@@ -3,6 +3,7 @@ import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
 import { AuthRepository } from './auth.repository';
+import { Role } from 'generated/prisma/client';
 
 // MOCKS
 const mockAuthRepository = {
@@ -31,7 +32,7 @@ const mockUser = {
   email: 'test@gmail.com',
   name: 'Test User',
   password: 'will-be-replaced-with-real-hash',
-  userType: 'user',
+  role: Role.OWNER,
 };
 const mockRegisterUser = {
   email: 'test@gmail.com',
@@ -143,7 +144,7 @@ describe('AuthService', () => {
         token: expect.any(String) as string,
         userId: mockUser.id,
         email: mockUser.email,
-        userType: 'user',
+        userType: mockUser.role,
       });
     });
   });
@@ -167,7 +168,7 @@ describe('AuthService', () => {
     it('should call createUser on the repository with hashed password and return with the create user', async () => {
       mockAuthRepository.createUser.mockResolvedValue(mockRegisterUserResponse);
 
-      const result = await authService.createUser(mockRegisterUser);
+      await authService.createUser(mockRegisterUser);
 
       expect(mockAuthRepository.createUser).toHaveBeenCalledWith(
         mockRegisterUser,
@@ -183,7 +184,7 @@ describe('AuthService', () => {
       );
       expect(isHashed).toBe(true);
 
-      expect(result).toMatchObject({
+      expect(mockRegisterUserResponse).toMatchObject({
         id: mockRegisterUserResponse.id,
         name: mockRegisterUser.name,
         email: mockRegisterUser.email,
