@@ -17,7 +17,7 @@ RUN npm ci
 COPY apps/api/prisma ./apps/api/prisma
 COPY apps/api ./apps/api
 
-# Generate Prisma Client and build the NestJS app using Turborepo
+# Generate Prisma Client (outputs to apps/generated/prisma) and build using Turborepo
 RUN npx prisma generate --schema=./apps/api/prisma/schema.prisma
 RUN npx turbo run build --filter=api
 
@@ -37,12 +37,14 @@ COPY apps/api/prisma ./apps/api/prisma
 # Install ONLY production dependencies
 RUN npm ci --omit=dev
 
-# Copy the Prisma engine from the specific workspace directory where it was generated
-COPY --from=builder /app/apps/api/node_modules/.prisma ./apps/api/node_modules/.prisma
-COPY --from=builder /app/apps/api/node_modules/@prisma/client ./apps/api/node_modules/@prisma/client
+# Ensure custom target generation folders exist in the runner stage
+RUN mkdir -p apps/generated/prisma
+
+# Copy the client binaries from your custom schema output path
+COPY --from=builder /app/apps/generated/prisma ./apps/generated/prisma
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
 EXPOSE 3001
 
-# Run migrations automatically right before booting up the server
+# Run migrations automatically and start the server, explicitly pointing to your schema file location
 CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma && node apps/api/dist/main.js"]
