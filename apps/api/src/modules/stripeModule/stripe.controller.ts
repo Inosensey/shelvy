@@ -88,6 +88,11 @@ export class StripeController {
     }
     const rawBody = (request as RequestWithRawBody).rawBody;
 
+    // Add this check
+    console.log('Raw body type:', typeof rawBody);
+    console.log('Raw body exists:', !!rawBody);
+    console.log('Signature:', signature);
+
     await this.stripeService.handleWebhook(rawBody, signature);
   }
 }
