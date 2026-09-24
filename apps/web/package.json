@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev --port 3000 --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
@@ -12,9 +12,17 @@
   },
   "dependencies": {
     "@repo/ui": "*",
+    "@tailwindcss/postcss": "^4.3.2",
+    "autoprefixer": "^10.5.4",
+    "lucide-react": "^1.24.0",
+    "motion": "^12.42.2",
     "next": "16.3.0",
+    "nextjs-toploader": "^3.9.17",
+    "postcss": "^8.4.31",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-loader-spinner": "^8.0.2",
+    "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",
