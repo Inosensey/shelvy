@@ -13,7 +13,6 @@ dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
-  useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.use(
     '/stripe/webhook',
     bodyParser.raw({
@@ -23,6 +22,7 @@ async function bootstrap() {
       },
     }),
   );
+  useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
   // Swagger setup
   const config = new DocumentBuilder()
