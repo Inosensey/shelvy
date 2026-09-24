@@ -28,7 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Upgrade npm globally here as well
-RUN npm install -g npm@11.18.0
+RUN npm install -g npm@11.17.0
 
 # Copy configuration files
 COPY package*.json ./
