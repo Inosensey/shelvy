@@ -13,7 +13,7 @@ COPY apps/api/package*.json ./apps/api/
 # Install ALL dependencies
 RUN npm ci
 
-# Copy from the exact subfolder location in the builder stage
+# Copy Prisma config, schema, and source files
 COPY apps/api/prisma.config.ts ./apps/api/
 COPY apps/api/prisma ./apps/api/prisma
 COPY apps/api ./apps/api
@@ -50,5 +50,5 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
 EXPOSE 3001
 
-#  Update the path flag to match where the configuration file lives
-CMD ["sh", "-c", "npx prisma migrate deploy --config=./apps/api/prisma.config.ts --schema=./apps/api/prisma/schema.prisma && node apps/api/dist/main.js"]
+# Changed target from dist/main.js to dist/src/main.js to match NestJS workspace structure
+CMD ["sh", "-c", "npx prisma migrate deploy --config=./apps/api/prisma.config.ts --schema=./apps/api/prisma/schema.prisma && node apps/api/dist/src/main.js"]
