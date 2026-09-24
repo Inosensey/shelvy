@@ -13,7 +13,8 @@ COPY apps/api/package*.json ./apps/api/
 # Install ALL dependencies
 RUN npm ci
 
-# Copy Prisma schema and source files
+# Copy Prisma config, schema, and source files
+COPY prisma.config.ts ./
 COPY apps/api/prisma ./apps/api/prisma
 COPY apps/api ./apps/api
 
@@ -26,7 +27,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Upgrade npm globally here as well to avoid validation errors
+# Upgrade npm globally here as well
 RUN npm install -g npm@11.18.0
 
 # Copy configuration files
@@ -34,17 +35,20 @@ COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
 COPY apps/api/prisma ./apps/api/prisma
 
+# Copy your prisma.config.ts so Prisma 7+ knows where to read DATABASE_URL
+COPY prisma.config.ts ./
+
 # Install ONLY production dependencies
 RUN npm ci --omit=dev
 
 # Ensure the correct production target folder exists in the runner stage
 RUN mkdir -p apps/api/generated/prisma
 
-# FIX: from the exact path where Prisma generated the client
+# Copy from the exact path where Prisma generated the client
 COPY --from=builder /app/apps/api/generated/prisma ./apps/api/generated/prisma
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
 EXPOSE 3001
 
-# Run migrations automatically and start the server
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma && node apps/api/dist/main.js"]
+# FIX 2: Point prisma to your config file during runtime migration deploy execution
+CMD ["sh", "-c", "npx prisma migrate deploy --config=prisma.config.ts --schema=./apps/api/prisma/schema.prisma && node apps/api/dist/main.js"]
