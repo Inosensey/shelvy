@@ -222,7 +222,7 @@ export const signIn = async (
   formData: FormData,
 ): Promise<ApiResponse<{ userId: string } | null>> => {
   const email = formData.get("email")?.toString() ?? "";
-  const password = formData.get("password")?.toString() ?? "";
+  const password = formData.get("loginPassword")?.toString() ?? "";
 
   const values = {
     email,
