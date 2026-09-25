@@ -19,7 +19,7 @@ const initialFormState: ApiResponse<{ userId: string } | null> = {
 
 const initialValidation: formValidation = {
   email: { validationName: "email", valid: true, validationMessage: "" },
-  password: { validationName: "password", valid: true, validationMessage: "" },
+  loginPassword: { validationName: "loginPassword", valid: true, validationMessage: "" },
 };
 
 export function LoginForm() {
@@ -27,7 +27,7 @@ export function LoginForm() {
 
   const [formState, formAction, isPending] = useActionState(signIn, initialFormState);
 
-  const [values, setValues] = useState({ email: "", password: "" });
+  const [values, setValues] = useState({ email: "", loginPassword: "" });
   const [validation, setValidation] = useState<formValidation>(initialValidation);
   const [submitMessage, setSubmitMessage] = useState("");
 
@@ -40,7 +40,6 @@ export function LoginForm() {
       setValidation((prev) => ({ ...prev, [name]: rule(value) }));
     }
   }
-
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     const results = validateGroupInput(values, loginValidationRules);
     const isValid = checkValidations(results, setValidation);
@@ -83,15 +82,15 @@ export function LoginForm() {
         />
 
         <AuthInput
-          id="password"
-          name="password"
+          id="loginPassword"
+          name="loginPassword"
           type="password"
           label="Password"
           autoComplete="current-password"
-          value={values.password}
+          value={values.loginPassword}
           onChange={handleChange}
-          valid={validation.password.valid}
-          validationMessage={validation.password.validationMessage}
+          valid={validation.loginPassword.valid}
+          validationMessage={validation.loginPassword.validationMessage}
         />
       </motion.fieldset>
 
