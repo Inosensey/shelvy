@@ -8,6 +8,6 @@ export const registerValidationRules = {
 
 export const loginValidationRules = {
   email: (value: string) => FormValidation({ stateName: "email", value }),
-  password: (value: string) =>
-    FormValidation({ stateName: "password", value }),
+  loginPassword: (value: string) =>
+    FormValidation({ stateName: "loginPassword", value }),
 };
