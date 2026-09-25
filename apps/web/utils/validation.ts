@@ -62,9 +62,11 @@ const FormValidation = (data: params): validation => {
     case "username":
       return validateUsername(data);
     case "identifier":
+    case "loginPassword":
+      return validateRequiredField(data);
       // login's combined username-or-email field -- required only, since
       // it could be either format
-      return validateUsername(data);
+      // return validateUsername(data);
     // case "birthDay":
     // case "birthMonth":
     // case "birthYear":
@@ -342,6 +344,21 @@ const validateConfirmPassword = (data: params): validation => {
     };
   }
   return {
+    validationName: data.stateName,
+    valid: true,
+    validationMessage: "",
+  };
+};
+
+const validateRequiredField = (data: params): validation => {
+  if (data.value.length === 0) {
+    return{
+      validationName: data.stateName,
+      valid: false,
+      validationMessage: "This field is required",
+    };
+  }
+  return{
     validationName: data.stateName,
     valid: true,
     validationMessage: "",
