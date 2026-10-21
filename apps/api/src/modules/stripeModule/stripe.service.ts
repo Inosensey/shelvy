@@ -17,6 +17,7 @@ import { UserResponseDTO } from '../usersModule/user.dto';
 import { AuthService } from '../authModule/auth.service';
 import { SubscriptionService } from '../subscriptionModule/subscription.service';
 import { UserService } from '../usersModule/user.service';
+import { NewUserResponseDTO } from '../authModule/auth.dto';
 
 @Injectable()
 export class StripeService {
@@ -376,7 +377,7 @@ export class StripeService {
           role: Role.OWNER,
         };
 
-        const newUser: UserResponseDTO = await this.authService.createUser(
+        const newUser: NewUserResponseDTO = await this.authService.createUser(
           userPayload,
           passwordAlreadyHashed,
         );
