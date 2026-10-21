@@ -6,8 +6,8 @@ export interface Movement {
   type: "IN" | "OUT" | "ADJUSTMENT";
   quantity: number;
   reason: string;
-  who: string;
-  when: string; // preformatted, e.g. "2h ago"
+  performedBy: string;
+  when: string;
 }
 
 const TYPE_STYLES = {
@@ -16,7 +16,7 @@ const TYPE_STYLES = {
   ADJUSTMENT: { icon: SlidersHorizontal, className: "bg-clay/10 text-clay" },
 };
 
-export function RecentMovementsTable({ movements }: { movements: Movement[] }) {
+export function RecentMovementsList({ movements }: { movements: Movement[] }) {
   return (
     <section className="rounded-xl border border-linen/10 bg-surface">
       <div className="border-b border-linen/10 px-5 py-4">
@@ -43,7 +43,7 @@ export function RecentMovementsTable({ movements }: { movements: Movement[] }) {
                     </span>
                   </p>
                   <p className="truncate text-xs text-linen/45">
-                    {m.reason} &middot; {m.who}
+                    {m.reason} &middot; {m.performedBy}
                   </p>
                 </div>
                 <span className="shrink-0 text-xs text-linen/40">{m.when}</span>

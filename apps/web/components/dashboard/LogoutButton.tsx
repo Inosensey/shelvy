@@ -5,14 +5,16 @@ import { LogOut, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { signOut } from "@/actions/authActions";
 
-export function LogoutButton() {
+interface props {
+  redirectTo?: string
+}
+
+export function LogoutButton({ redirectTo }:props) {
   const [isPending, startTransition] = useTransition();
 
   function handleClick() {
     startTransition(async () => {
-      // signOut() clears the session server-side and redirects on its own
-      // (via next/navigation's redirect()) -- no client-side router.push needed.
-      await signOut();
+      await signOut(redirectTo);
     });
   }
 
