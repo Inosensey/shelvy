@@ -1,8 +1,12 @@
 // src/prismaConfig/prisma.service.ts
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from 'generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { PrismaNeon } from '@prisma/adapter-neon';
+import { neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
+
+// Required so the serverless driver can use WebSockets in Node.js environments
+neonConfig.webSocketConstructor = ws;
 
 @Injectable()
 export class PrismaService
@@ -10,11 +14,11 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    // Use PostgreSQL adapter
-    const pool = new Pool({
+    // 1. Establish the Neon Serverless Pool
+    const adapter = new PrismaNeon({
       connectionString: process.env.DATABASE_URL,
     });
-    const adapter = new PrismaPg(pool);
+
     super({ adapter });
   }
 
@@ -23,7 +27,7 @@ export class PrismaService
 
     try {
       await this.$connect();
-      console.log('✅ Prisma connected successfully');
+      console.log('✅ Prisma connected successfully to Neon');
 
       const result = await this.$queryRaw`SELECT NOW()`;
       console.log('✅ Database response:', result);
