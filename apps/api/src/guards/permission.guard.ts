@@ -7,15 +7,9 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { ALLOW_NO_ORG } from 'src/decorators/allowWithoutOrg.decorator';
+import { AuthenticatedRequest } from 'src/types/request';
 
-interface AuthenticatedUser {
-  userId: string;
-  userType: string;
-}
-
-interface AuthenticatedRequest extends Request {
-  user?: AuthenticatedUser;
-}
 type userType = string;
 type PermissionName = string;
 type ResourcePermissions = Record<userType, PermissionName[]>;
@@ -40,12 +34,17 @@ export class PermissionsGuard implements CanActivate {
       STAFF: ['READ', 'UPDATE'],
     },
     organizations: {
-      OWNER: ['CREATE', 'READ', 'UPDATE', 'MANAGE_ROLES'],
+      OWNER: ['CREATE', 'READ', 'UPDATE', 'DELETE', 'MANAGE_ROLES'],
     },
     products: {
       OWNER: ['CREATE', 'READ', 'UPDATE', 'MANAGE_ROLES'],
       MANAGER: ['CREATE', 'READ', 'UPDATE'],
       STAFF: ['CREATE', 'READ', 'DELETE', 'UPDATE'],
+    },
+    notifications: {
+      OWNER: ['READ', 'UPDATE'],
+      MANAGER: ['READ', 'UPDATE'],
+      STAFF: ['READ', 'UPDATE'],
     },
     // Default/fallback permissions
     default: {
@@ -62,6 +61,21 @@ export class PermissionsGuard implements CanActivate {
 
     if (!user) {
       throw new ForbiddenException('User not authenticated');
+    }
+
+    const allowNoOrg = this.reflector.getAllAndOverride<boolean>(ALLOW_NO_ORG, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (!user.organizationId) {
+      if (!allowNoOrg) {
+        throw new ForbiddenException({
+          code: 'NO_ORGANIZATION',
+          message: 'You are not part of an organization.',
+        });
+      }
+      return true;
     }
 
     const resource = this.getResourceFromUrl(request.url);
