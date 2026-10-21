@@ -4,13 +4,13 @@ import {
   IsOptional,
   IsNotEmpty,
   MaxLength,
-  IsDateString,
   ValidateNested,
   IsDate,
 } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateOrganizationDTO } from '../organizationModule/organization.dto';
+import { RegisterMemberDTO } from '../authModule/auth.dto';
 
 // ============================================
 // CreateUserInfoDTO (what we receive from the client)
@@ -63,7 +63,7 @@ export class CreateUserInfoDTO {
   @IsOptional()
   @Type(() => Date)
   @IsDate({ message: 'Please provide a valid birth date.' })
-  birthDate?: string;
+  birthDate?: Date;
 
   @ApiPropertyOptional({
     example: 'Male',
@@ -156,18 +156,21 @@ export class UserInfoResponseDTO {
     example: 'John',
     description: 'First name',
   })
+  @Expose()
   firstName!: string;
 
   @ApiPropertyOptional({
     example: 'Michael',
     description: 'Middle name',
   })
+  @Expose()
   middleName!: string | null;
 
   @ApiProperty({
     example: 'Doe',
     description: 'Last name',
   })
+  @Expose()
   lastName!: string;
 
   @ApiPropertyOptional({
@@ -238,7 +241,7 @@ export class UserInfoResponseDTO {
 // ============================================
 // Create OnboardingInfoDTO (what we receive from the client)
 // ============================================
-export class SaveOnboardingDTO {
+export class SaveOrgOnboardingDTO {
   @ApiProperty({
     type: CreateUserInfoDTO,
   })
@@ -254,6 +257,22 @@ export class SaveOnboardingDTO {
   organization!: CreateOrganizationDTO;
 }
 
+export class SaveMemberOnboardingDTO {
+  @ApiProperty({
+    type: RegisterMemberDTO,
+  })
+  @ValidateNested()
+  @Type(() => RegisterMemberDTO)
+  credentials!: RegisterMemberDTO;
+
+  @ApiProperty({
+    type: CreateUserInfoDTO,
+  })
+  @ValidateNested()
+  @Type(() => CreateUserInfoDTO)
+  userInfo!: CreateUserInfoDTO;
+}
+
 // ============================================
 // RESPONSE DTO (what we return to the client)
 // ============================================
@@ -264,6 +283,13 @@ export class UserResponseDTO {
 
   @ApiProperty({ example: 'John@example.com' })
   email!: string;
+
+  @ApiProperty({ enum: ['OWNER', 'MANAGER', 'STAFF'], example: 'STAFF' })
+  role!: string;
+
+  @ApiProperty({ example: 'org_1234567890', nullable: true })
+  @IsOptional()
+  organizationId: string | null = null;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
   createdAt!: Date;

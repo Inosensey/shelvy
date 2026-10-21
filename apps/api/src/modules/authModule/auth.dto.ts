@@ -47,6 +47,31 @@ export class RegisterDTO {
   plan?: SubscriptionPlan;
 }
 
+export class RegisterMemberDTO {
+  @ApiProperty({ example: 'John@example.com' })
+  @IsEmail({}, { message: 'Please provide a valid email address.' })
+  @IsNotEmpty({ message: 'Email is required.' })
+  @Transform(({ value }: { value: string }) => value?.toLowerCase().trim())
+  email!: string;
+
+  @ApiProperty({ example: 'StrongP@ssw0rd' })
+  @IsString()
+  @IsNotEmpty({ message: 'Password is required.' })
+  @MinLength(8, { message: 'Password must be at least 8 characters long.' })
+  @MaxLength(20, { message: 'Password cannot exceed 20 characters.' })
+  @IsStrongPassword(
+    {
+      minLength: 8,
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 1,
+    },
+    { message: 'Password is too weak.' },
+  )
+  password!: string;
+}
+
 // ============================================
 // LOGIN DTO
 // ============================================
@@ -73,4 +98,18 @@ export class AuthResponseDTO {
 
   @ApiProperty({ type: UserResponseDTO })
   user!: UserResponseDTO;
+}
+
+export class NewUserResponseDTO {
+  @ApiProperty({ example: 'usr_1234567890' })
+  id!: string;
+
+  @ApiProperty({ example: 'John@example.com' })
+  email!: string;
+
+  @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
+  updatedAt!: Date | null;
 }

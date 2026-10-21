@@ -31,7 +31,7 @@ import { UserService } from './user.service';
 // DTOs
 import {
   CreateUserInfoDTO,
-  SaveOnboardingDTO,
+  SaveOrgOnboardingDTO,
   UserInfoResponseDTO,
   UserResponseDTO,
 } from './user.dto';
@@ -39,6 +39,7 @@ import { CreateOrganizationDTO } from '../organizationModule/organization.dto';
 
 // types
 import type { AuthenticatedRequest } from 'src/types/request';
+import { AllowWithoutOrganization } from 'src/decorators/allowWithoutOrg.decorator';
 
 @ApiTags('users')
 @Controller('users')
@@ -65,6 +66,7 @@ export class UserController {
     status: 404,
     description: 'User information not found',
   })
+  @AllowWithoutOrganization()
   @UseGuards(AuthGuard, PermissionsGuard)
   @Get('me/info')
   async getMeInfo(@Req() req: AuthenticatedRequest) {
@@ -97,7 +99,12 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @UseGuards(AuthGuard, PermissionsGuard)
   @Get('/:id')
-  async getUserById(@Param('id') userId: string) {
+  async getUserById(
+    @Param('id') userId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    this.userService.assertUser(userId, req);
+
     const user = await this.userService.getUserById(userId);
     return ApiResponseShaper.success(user, 'User retrieved successfully');
   }
@@ -118,8 +125,9 @@ export class UserController {
     status: 401,
     description: 'Unauthorized - Missing or invalid authentication token',
   })
+  @AllowWithoutOrganization()
   @UseGuards(AuthGuard, PermissionsGuard)
-  @Get('me')
+  @Get('me/user')
   async getMe(@Req() req: AuthenticatedRequest) {
     const user = await this.userService.getUserById(req.user.userId);
 
@@ -153,6 +161,7 @@ export class UserController {
     status: 409,
     description: 'Conflict - User information already exists',
   })
+  @AllowWithoutOrganization()
   @UseGuards(AuthGuard, PermissionsGuard)
   @Post('me/info')
   async createUserInfo(
@@ -203,20 +212,67 @@ export class UserController {
     description:
       'Conflict - User has already completed onboarding or organization already exists',
   })
+  @AllowWithoutOrganization()
   @UseGuards(AuthGuard, PermissionsGuard)
-  @Post('me/onboarding')
-  async saveOnboardingInfo(
+  @Post('me/org/onboarding')
+  async saveOrgOnboardingInfo(
     @Req() req: AuthenticatedRequest,
     @Body()
-    data: SaveOnboardingDTO,
+    data: SaveOrgOnboardingDTO,
   ) {
-    const result = await this.userService.saveOnboardingInfo(
+    const result = await this.userService.saveOrgOnboardingInfo(
       data,
       req.user.userId,
     );
     return ApiResponseShaper.success(
       result,
       'Onboarding completed successfully',
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Save member onboarding information',
+    description:
+      'Saves the profile information for an invited member to complete their platform entry setup.',
+  })
+  @ApiBearerAuth()
+  @ApiCookieAuth('token')
+  @ApiBody({
+    description:
+      'User profile information required to complete member onboarding.',
+    schema: {
+      type: 'object',
+      properties: {
+        userInfo: { $ref: getSchemaPath(CreateUserInfoDTO) },
+      },
+      required: ['userInfo'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Member onboarding completed successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid user profile onboarding data',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Member profile has already been initialized',
+  })
+  @Post('me/member/onboarding')
+  async saveMemberOnboardingInfo(
+    @Body()
+    data: {
+      token: string;
+      password: string;
+      userInfo: CreateUserInfoDTO;
+    },
+  ) {
+    const result = await this.userService.saveMemberOnboardingInfo(data);
+    return ApiResponseShaper.success(
+      result,
+      'Member onboarding completed successfully',
     );
   }
 }

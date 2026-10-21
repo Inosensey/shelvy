@@ -4,7 +4,12 @@ import { Injectable } from '@nestjs/common';
 
 // Services
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
-import { CreateUserInfoDTO, SaveOnboardingDTO } from './user.dto';
+import {
+  CreateUserInfoDTO,
+  SaveMemberOnboardingDTO,
+  SaveOrgOnboardingDTO,
+} from './user.dto';
+import { InviteRole } from 'generated/prisma/enums';
 
 @Injectable()
 export class UserRepository {
@@ -17,11 +22,13 @@ export class UserRepository {
         id: true,
         email: true,
         stripeCustomerId: true,
+        organizationId: true,
         subscriptions: {
           select: {
             id: true,
           },
         },
+        role: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -65,7 +72,7 @@ export class UserRepository {
     });
   }
 
-  async saveOnboardingInfo(data: SaveOnboardingDTO, userId: string) {
+  async saveOrgOnboardingInfo(data: SaveOrgOnboardingDTO, userId: string) {
     return this.prisma.$transaction(async (prisma) => {
       // Create user info
       const userInfo = await prisma.userInfo.create({
@@ -86,6 +93,32 @@ export class UserRepository {
       });
 
       return { userInfo, organization };
+    });
+  }
+
+  async saveMemberOnboardingInfo(
+    payload: SaveMemberOnboardingDTO,
+    organizationId: string,
+    role: InviteRole,
+  ) {
+    return this.prisma.$transaction(async (prisma) => {
+      const user = await prisma.user.create({
+        data: {
+          ...payload.credentials,
+          organizationId: organizationId,
+          role: role,
+        },
+      });
+      const userInfo = await prisma.userInfo.create({
+        data: {
+          userId: user.id,
+          ...payload.userInfo,
+          birthDate: payload.userInfo.birthDate
+            ? new Date(payload.userInfo.birthDate)
+            : null,
+        },
+      });
+      return { user, userInfo };
     });
   }
 }
