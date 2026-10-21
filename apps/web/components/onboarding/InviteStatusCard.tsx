@@ -8,17 +8,11 @@ interface StatusConfig {
   action?: { href: string; label: string };
 }
 
-const STATUS_CONFIG: Record<Exclude<InviteStatus, "pending">, StatusConfig> = {
-  INVALID: {
-    icon: XCircle,
-    heading: "Invite not found",
-    description: "This invite link doesn't match any invitation we have on file.",
-    action: { href: "/login", label: "Go to sign in" },
-  },
+const STATUS_CONFIG: Record<Exclude<InviteStatus, "PENDING">, StatusConfig> = {
   EXPIRED: {
     icon: Clock,
     heading: "This invite has expired",
-    description: "Ask whoever invited you to send a new invitation.",
+    description: "Ask whoever invited you to send a new invitation link.",
     action: { href: "/login", label: "Go to sign in" },
   },
   COMPLETED: {
@@ -26,6 +20,12 @@ const STATUS_CONFIG: Record<Exclude<InviteStatus, "pending">, StatusConfig> = {
     heading: "Invite already used",
     description: "This invitation has already been accepted. You can sign in instead.",
     action: { href: "/login", label: "Go to sign in" },
+  },
+  REVOKED: {
+    icon: XCircle,
+    heading: "Invitation revoked",
+    description: "This invitation has been cancelled by an administrator.",
+    action: { href: "/login", label: "Go back home" },
   },
 };
 
