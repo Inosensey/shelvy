@@ -293,7 +293,7 @@ export const signIn = async (
   }
 };
 
-export const signOut = async (): Promise<ApiResponse<null>> => {
+export const signOut = async (redirectTo?: string): Promise<ApiResponse<null>> => {
   const cookieStore = await cookies();
   try {
     const response = await nestJsEndpoints.authApi.signOut();
@@ -328,6 +328,6 @@ export const signOut = async (): Promise<ApiResponse<null>> => {
       message: errorMessage,
     };
   } finally {
-    redirect("/login");
+    redirect(redirectTo ? redirectTo : "/login");
   }
 };

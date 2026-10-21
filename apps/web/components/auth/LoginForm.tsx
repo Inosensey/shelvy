@@ -10,6 +10,7 @@ import { loginValidationRules } from "@/utils/validationRules";
 import { validateGroupInput, checkValidations } from "@/utils/validation";
 import type { formValidation } from "@/utils/validation.types";
 import { FormMessage } from "../reusable/FormMessage";
+import { safeRedirect } from "@/lib/safeRedirect";
 
 const initialFormState: ApiResponse<{ userId: string } | null> = {
   success: false,
@@ -22,7 +23,11 @@ const initialValidation: formValidation = {
   loginPassword: { validationName: "loginPassword", valid: true, validationMessage: "" },
 };
 
-export function LoginForm() {
+interface props {
+  redirectTo?: string
+}
+
+export function LoginForm({redirectTo}:props) {
   const router = useRouter();
 
   const [formState, formAction, isPending] = useActionState(signIn, initialFormState);
@@ -53,7 +58,7 @@ export function LoginForm() {
 
     if (formState.success) {
       setSubmitMessage(formState.message);
-      const timer = setTimeout(() => router.push("/dashboard"), 1200);
+      const timer = setTimeout(() => router.push(safeRedirect(redirectTo)), 1200);
       return () => clearTimeout(timer);
     }
 
