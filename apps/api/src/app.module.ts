@@ -8,17 +8,22 @@ import { AuthModule } from './modules/authModule/auth.module';
 import { UserModule } from './modules/usersModule/user.module';
 import { ConfigModule } from '@nestjs/config';
 import { OrganizationModule } from './modules/organizationModule/organization.module';
+import { NodemailerModule } from './NodemailerConfig/Nodemailer.module';
+import { SocketGatewayModule } from './socketGateway/gateway.module';
+import { NotificationModule } from './modules/notificationModule/notification.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
-    ConfigModule,
     AuthModule,
     UserModule,
     OrganizationModule,
     StripeModule,
     SubscriptionModule,
+    NodemailerModule,
+    SocketGatewayModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
