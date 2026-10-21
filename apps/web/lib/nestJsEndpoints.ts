@@ -161,42 +161,240 @@ class NestJsEndpoints {
       return response;
     },
     signOut: async () => {
-      return this.request("/users/auth/sign-out");
+      return this.request("/auth/sign-out", {
+        method: "POST",
+      });
     },
   };
 
   // User API
   userApi = {
+    getMe: async (): Promise<ApiResponse<User | null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<User | null> = await this.request(
+        "/users/me/user",
+        {
+          next: { tags: ["me", this.user_id!, `me-${this.user_id!}`] },
+        },
+      );
+      return response;
+    },
     getMeInfo: async (): Promise<ApiResponse<UserInformation | null>> => {
       await this.initFromCookies();
-      const response: ApiResponse<UserInformation | null> =
-        await this.request("/users/me/info", {next: {tags: ["meInfo", this.user_id!, `meInfo-${this.user_id!}`]}});
+      const response: ApiResponse<UserInformation | null> = await this.request(
+        "/users/me/info",
+        {
+          next: { tags: ["meInfo", this.user_id!, `meInfo-${this.user_id!}`] },
+        },
+      );
 
       return response;
     },
-    saveUserInfo: async (data: UserInformation,
+    saveUserInfo: async (
+      data: UserInformation,
     ): Promise<ApiResponse<UserInformation | null>> => {
       await this.initFromCookies();
-      const response: ApiResponse<UserInformation | null> =
-        await this.request("/users/me/info", {
+      const response: ApiResponse<UserInformation | null> = await this.request(
+        "/users/me/info",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+      );
+      return response;
+    },
+    saveOnboardingInfo: async (
+      data: OnboardingInfo,
+    ): Promise<ApiResponse<OnboardingInfo | null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<OnboardingInfo | null> = await this.request(
+        "/users/me/org/onboarding",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+      );
+      return response;
+    },
+    saveMemberOnboardingInfo: async (data: {
+      token: string;
+      password: string;
+      userInfo: UserInformation;
+    }): Promise<ApiResponse<null | InviteValidationResult>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<null | InviteValidationResult> =
+        await this.request("/users/me/member/onboarding", {
           method: "POST",
           body: JSON.stringify(data),
         });
       return response;
     },
-    saveOnboardingInfo: async (data: OnboardingInfo,
-    ): Promise<ApiResponse<OnboardingInfo | null>> => {
-      await this.initFromCookies();
-      const response: ApiResponse<OnboardingInfo | null> =
-        await this.request("/users/me/onboarding", {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      return response;
-    }
   };
 
   // Organization API
+  organizationApi = {
+    sendInviteEmail: async (
+      data: SendInviteEmailPayload,
+    ): Promise<ApiResponse<null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<null> = await this.request(
+        "/organizations/send-invite-email",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+      );
+      return response;
+    },
+    resendInviteEmail: async (
+      token: string,
+    ): Promise<ApiResponse<OrgInvite | null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<OrgInvite | null> = await this.request(
+        `/organizations/invites/${token}/resend`,
+        {
+          method: "PUT",
+        },
+      );
+      return response;
+    },
+    revokeInvite: async (
+      token: string,
+    ): Promise<ApiResponse<OrgInvite | null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<OrgInvite | null> = await this.request(
+        `/organizations/invites/${token}/revoke`,
+        {
+          method: "DELETE",
+          next: { tags: ["orgRevokedInvites"] },
+        },
+      );
+      return response;
+    },
+    removeMember: async (
+      memberId: string,
+    ): Promise<ApiResponse<string | null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<string | null> = await this.request(
+        `/organizations/members/${memberId}`,
+        {
+          method: "DELETE",
+        },
+      );
+      return response;
+    },
+    acceptInvite: async (token: string): Promise<ApiResponse<null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<null> = await this.request(
+        `/organizations/invites/${token}/accept`,
+        {
+          method: "POST",
+        },
+      );
+      return response;
+    },
+    validateInviteToken: async (
+      token: string | undefined,
+    ): Promise<ApiResponse<InviteValidationResult | null>> => {
+      await this.initFromCookies();
+      if (!token) {
+        return {
+          success: false,
+          message: "Invalid token",
+          data: {
+            status: "EXPIRED",
+          },
+        };
+      }
+      const response: ApiResponse<InviteValidationResult | null> =
+        await this.request(
+          `/organizations/invite/validate?token=${encodeURIComponent(token)}`,
+          {
+            method: "GET",
+          },
+        );
+      if (response.data === null) {
+        response.data = { status: "EXPIRED" };
+      }
+      return response;
+    },
+    getOrganizationMembers: async (): Promise<
+      ApiResponse<OrgMember[] | null>
+    > => {
+      await this.initFromCookies();
+      const response: ApiResponse<OrgMember[] | null> = await this.request(
+        `/organizations/my/members`,
+        {
+          method: "GET",
+          next: { tags: ["orgMembers"] },
+        },
+      );
+
+      return response;
+    },
+    getInviteRecords: async (): Promise<ApiResponse<OrgInvite[] | null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<OrgInvite[] | null> = await this.request(
+        `/organizations/my/invites`,
+        {
+          method: "GET",
+        },
+      );
+      return response;
+    },
+    getPendingInviteRecords: async (): Promise<
+      ApiResponse<OrgInvite[] | null>
+    > => {
+      await this.initFromCookies();
+      const response: ApiResponse<OrgInvite[] | null> = await this.request(
+        `/organizations/my/invites/pending`,
+        {
+          method: "GET",
+          next: { tags: ["orgPendingInvites"] },
+        },
+      );
+      return response;
+    },
+    getRevokedInviteRecords: async (): Promise<
+      ApiResponse<OrgInvite[] | null>
+    > => {
+      await this.initFromCookies();
+      const response: ApiResponse<OrgInvite[] | null> = await this.request(
+        `/organizations/my/invites/revoked`,
+        {
+          method: "GET",
+          next: { tags: ["orgRevokedInvites"] },
+        },
+      );
+      return response;
+    },
+  };
+
+  // Notifications API
+  notificationsApi = {
+    getMyNotifications: async (): Promise<
+      ApiResponse<NotificationWithMetadata[] | null>
+    > => {
+      await this.initFromCookies();
+      const response: ApiResponse<NotificationWithMetadata[] | null> =
+        await this.request(`/notifications`, {
+          next: { tags: ["myNotifications"] },
+        });
+
+      return response;
+    },
+    markAllRead: async (): Promise<ApiResponse<null>> => {
+      await this.initFromCookies();
+      const response: ApiResponse<null> = await this.request(
+        "/notifications/read-all",
+        {
+          method: "PATCH",
+        },
+      );
+
+      return response;
+    },
+  };
 
   // Products API
 }
