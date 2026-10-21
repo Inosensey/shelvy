@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -31,6 +32,19 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <NextTopLoader color="#dcd7c9" showSpinner={true} />
         {children}
+        <Toaster
+          position="bottom-right"
+          theme="dark"
+          toastOptions={{
+            classNames: {
+              toast: "!bg-surface !border !border-linen/10 !text-linen",
+              title: "!text-linen",
+              description: "!text-linen/60",
+              success: "!text-clay",
+              error: "!text-red-400",
+            },
+          }}
+        />
       </body>
     </html>
   );
