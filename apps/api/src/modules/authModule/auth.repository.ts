@@ -50,6 +50,20 @@ export class AuthRepository {
   async userFindById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
+      select: {
+        id: true,
+        email: true,
+        stripeCustomerId: true,
+        organizationId: true,
+        subscriptions: {
+          select: {
+            id: true,
+          },
+        },
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 

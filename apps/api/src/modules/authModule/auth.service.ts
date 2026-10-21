@@ -8,7 +8,7 @@ import * as jwt from 'jsonwebtoken';
 import { AuthRepository } from './auth.repository';
 
 // Dto's
-import { LoginDTO } from './auth.dto';
+import { LoginDTO, NewUserResponseDTO } from './auth.dto';
 
 // Types
 import { SessionService } from './session.service';
@@ -25,14 +25,14 @@ export class AuthService {
   async createUser(
     data: Prisma.UserCreateInput,
     passwordAlreadyHashed: boolean = false,
-  ): Promise<UserResponseDTO> {
+  ): Promise<NewUserResponseDTO> {
     const hashedPassword = passwordAlreadyHashed
       ? data.password!
       : await bcrypt.hash(data.password!, 10);
 
     const user = await this.authRepository.createUser(data, hashedPassword);
 
-    const response: UserResponseDTO = {
+    const response: NewUserResponseDTO = {
       id: user.id,
       email: user.email,
       createdAt: user.createdAt,
@@ -80,7 +80,7 @@ export class AuthService {
     await this.session.invalidateAllUserSessions(user.id);
 
     // Create JWT token
-    const token = this.generateJwtToken(user.id, user.role);
+    const token = this.generateJwtToken(user.id);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -99,7 +99,7 @@ export class AuthService {
     await this.session.invalidateSession(token);
   }
 
-  private generateJwtToken(userId: string, userType: string): string {
+  private generateJwtToken(userId: string): string {
     if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET is not defined in environment variables');
     }
@@ -107,7 +107,6 @@ export class AuthService {
     return jwt.sign(
       {
         userId,
-        userType,
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' },
