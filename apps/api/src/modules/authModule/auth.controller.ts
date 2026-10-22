@@ -37,6 +37,7 @@ import { SessionService } from './session.service';
 import { RegisterDTO, LoginDTO } from './auth.dto';
 import { UserResponseDTO } from 'src/modules/usersModule/user.dto';
 import { SubscriptionPlan } from 'generated/prisma/enums';
+import type { AuthenticatedRequest } from 'src/types/request';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -169,5 +170,12 @@ export class AuthController {
       return ApiResponseShaper.success(true, 'Session is valid');
     }
     return ApiResponseShaper.success(false, 'Session is invalid');
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('socket-ticket')
+  getSocketTicket(@Req() req: AuthenticatedRequest) {
+    const ticket = this.authService.createSocketTicket(req);
+    return ApiResponseShaper.success({ ticket }, 'Socket ticket issued');
   }
 }

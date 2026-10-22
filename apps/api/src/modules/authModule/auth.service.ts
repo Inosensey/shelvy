@@ -14,13 +14,25 @@ import { LoginDTO, NewUserResponseDTO } from './auth.dto';
 import { SessionService } from './session.service';
 import { UserResponseDTO } from '../usersModule/user.dto';
 import { Prisma } from 'generated/prisma/client';
+import { JwtService } from '@nestjs/jwt';
+import { AuthenticatedRequest } from 'src/types/request';
 
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly jwtService: JwtService,
     private readonly session: SessionService,
     private readonly authRepository: AuthRepository,
   ) {}
+
+  createSocketTicket(req: AuthenticatedRequest) {
+    const ticket = this.jwtService.sign(
+      { userId: req.user.userId, purpose: 'socket' },
+      { secret: process.env.JWT_SECRET, expiresIn: '60s' },
+    );
+
+    return ticket;
+  }
 
   async createUser(
     data: Prisma.UserCreateInput,
