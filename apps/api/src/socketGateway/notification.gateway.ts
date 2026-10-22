@@ -40,23 +40,10 @@ export class NotificationGateway
 
   async handleConnection(client: Socket<any, any, any, SocketData>) {
     try {
-      const rawCookies = client.handshake.headers.cookie;
+      const ticket = client.handshake.auth?.token as string | undefined;
 
-      const tokenCookie = rawCookies
-        ?.split(';')
-        ?.find((c) => c.trim().startsWith('token='));
-
-      const token = tokenCookie ? tokenCookie.split('=')[1] : undefined;
-
-      // const authHeader = client.handshake.headers?.authorization;
-
-      // const token =
-      //   (client.handshake.auth?.token as string) ||
-      //   (authHeader?.startsWith('Bearer ')
-      //     ? authHeader.split(' ')[1]
-      //     : undefined);
-
-      if (!token) {
+      if (!ticket) {
+        console.warn('Socket rejected: no ticket');
         client.emit('exception', {
           success: false,
           message: 'Authentication token missing.',
@@ -65,36 +52,34 @@ export class NotificationGateway
         return;
       }
 
-      const session = await this.prisma.session.findUnique({
-        where: { token },
-        include: {
-          user: { select: { id: true, role: true, organizationId: true } },
-        },
+      const payload = this.jwtService.verify<{
+        userId: string;
+        purpose?: string;
+      }>(ticket, {
+        secret: process.env.JWT_SECRET,
       });
-      if (!session || !session.isValid || session.expiresAt < new Date()) {
-        throw new Error('Invalid session');
-      }
+      if (payload.purpose !== 'socket') throw new Error('Wrong token type');
 
-      const { id: userId, role, organizationId } = session.user;
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { id: true, role: true, organizationId: true },
+      });
+      if (!user) throw new Error('User not found');
 
+      const { id: userId, role, organizationId: orgId } = user;
       client.data.userId = userId;
+      client.data.organizationId = orgId;
 
-      const orgId = organizationId;
       if (orgId) {
         await client.join(`org:${orgId}`);
         console.log(`Client ${client.id} joined room -> org:${orgId}`);
-
         await client.join(`org:${orgId}:${role.toLowerCase()}`);
       }
-
       await client.join(`user:${userId}`);
-
-      client.data.userId = userId;
-      client.data.organizationId = orgId;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Invalid token context';
-
+      console.warn('Socket auth failed:', errorMessage); // new: shows up in Render logs
       client.emit('exception', {
         success: false,
         message: `Connection unauthorized: ${errorMessage}`,
