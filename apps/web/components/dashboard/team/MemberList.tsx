@@ -2,10 +2,6 @@
 
 import { RoleBadge } from "@/components/dashboard/team/RoleBadge";
 import { RemoveMemberButton } from "./RemoveMemberButton";
-import { useEffect } from "react";
-import { useSocket } from "../../../app/dashboard/SocketProvider";
-import { useRouter } from "next/navigation";
-import { memberJoinedListener } from "@/lib/socket/listeners/memberJoin.listener";
 
 interface MemberListProps {
   members: OrgMember[];
@@ -18,14 +14,14 @@ export function MemberList({
   currentUserId,
   isOwner,
 }: MemberListProps) {
-  const socket = useSocket();
-  const router = useRouter();
+  // const socket = useSocket();
+  // const router = useRouter();
 
-  useEffect(() => {
-    const { cleanUp } = memberJoinedListener(socket, router);
+  // useEffect(() => {
+  //   const { cleanUp } = memberJoinedListener(socket, router);
 
-    return cleanUp;
-  }, [socket, router]);
+  //   return cleanUp;
+  // }, [socket, router]);
 
   return (
     <section className="rounded-xl border border-linen/10 bg-surface">
