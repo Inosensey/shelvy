@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
 import { CreateOrganizationDTO } from './organization.dto';
-import { InviteRole, Role } from 'generated/prisma/enums';
+import { InviteRole, NotificationType, Role } from 'generated/prisma/enums';
 import { NodemailerService } from 'src/NodemailerConfig/Nodemailer.service';
 import { UserService } from '../usersModule/user.service';
 
@@ -111,15 +111,13 @@ export class OrganizationRepository {
         data: { organizationId: invite.organizationId, role: invite.role },
       });
 
-      const notification = await tx.notification.create({
-        data: {
-          organizationId: invite.organizationId,
-          userId: invite.organization.ownerId,
-          type: 'MEMBER_JOINED',
-          title: 'New member joined',
-          message: `${user.email} accepted your invite.`,
-        },
-      });
+      const notification = {
+        organizationId: invite.organizationId,
+        userId: invite.organization.ownerId,
+        type: NotificationType.MEMBER_JOINED,
+        title: 'New member joined',
+        message: `${user.email} accepted your invite.`,
+      };
 
       return { notification };
     });
