@@ -17,6 +17,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       console.log("Socket connected:", newSocket.id);
     });
 
+    newSocket.on("exception", (e) => console.warn("Socket exception:", e));
+    newSocket.on("disconnect", (reason) =>
+      console.warn("Socket disconnected:", reason),
+    );
+
     setSocket(newSocket);
 
     return () => {
