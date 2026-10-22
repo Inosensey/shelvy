@@ -9,8 +9,16 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-      withCredentials: true,
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL!, {
+      auth: async (cb) => {
+        try {
+          const res = await fetch("/api/socket-ticket", { cache: "no-store" });
+          const { ticket } = await res.json();
+          cb({ token: ticket });
+        } catch {
+          cb({});
+        }
+      },
     });
 
     newSocket.on("connect", () => {

@@ -165,6 +165,14 @@ class NestJsEndpoints {
         method: "POST",
       });
     },
+    createSocketTicket: async (): Promise<
+      ApiResponse<{ ticket: string } | null>
+    > => {
+      await this.initFromCookies();
+      const response: ApiResponse<{ ticket: string } | null> =
+        await this.request("/auth/socket-ticket");
+      return response;
+    },
   };
 
   // User API
