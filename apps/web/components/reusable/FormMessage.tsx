@@ -29,7 +29,15 @@ export function FormMessage({ message, success }: FormMessageProps) {
           ) : (
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
           )}
-          <span>{message}</span>
+          {Array.isArray(message) ? (
+            <ul>
+              {message.map((message, index) => (
+                <li key={index}>{message}</li>
+              ))}
+            </ul>
+          ) : (
+            <span>{message}</span>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

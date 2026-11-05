@@ -11,3 +11,8 @@ export const loginValidationRules = {
   loginPassword: (value: string) =>
     FormValidation({ stateName: "loginPassword", value }),
 };
+
+export const supplierFormValidationRules = {
+  name: (value: string) => FormValidation({ stateName: "name", value }),
+  email: (value: string) => FormValidation({ stateName: "email", value }),
+};
