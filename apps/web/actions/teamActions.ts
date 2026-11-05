@@ -1,7 +1,7 @@
 "use server";
 
 import { nestJsEndpoints } from "@/lib/nestJsEndpoints";
-import { revalidateTag, updateTag } from "next/cache";
+import { updateTag } from "next/cache";
 
 export const inviteMember = async (
   prevState: ApiResponse<null>,
@@ -133,12 +133,4 @@ export async function resendInviteRecord(
       data: null,
     };
   }
-}
-export async function revalidateInviteCache() {
-  revalidateTag("orgPendingInvites", "max");
-  revalidateTag("orgRevokedInvites", "max");
-}
-
-export async function revalidateMemberCache() {
-  revalidateTag("orgMembers", "max");
 }
