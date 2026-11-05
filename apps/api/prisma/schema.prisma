@@ -29,6 +29,8 @@ model Organization {
   products            Product[]
   suppliers           Supplier[]
   notifications       Notification[] 
+  stockMovements      StockMovement[] 
+  stockMovementRequests StockMovementRequest[]
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -73,6 +75,8 @@ model User {
 
   // Organization owned by this user
   ownedOrganization Organization? @relation("OrganizationOwner")
+  requestedMovements StockMovementRequest[] @relation("RequestedMovements")
+  decidedMovements StockMovementRequest[] @relation("DecidedMovements")
 
   organizationInvites OrganizationInvite[]
   stockMovements      StockMovement[]
@@ -197,24 +201,30 @@ model SubscriptionPaymentHistory {
 }
 
 model Product {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   name              String
-  description       String?
-  price             Decimal
-  stock             Int      @default(0)
-  lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  description       String?  
+  sku               String?
+  price             Decimal   @db.Decimal(12, 2)
+  stock             Int       @default(0)   // cached balance: only ever changed by a stock movement
+  lowStockThreshold Int       @default(5) @map("low_stock_threshold")
+  archivedAt        DateTime? @map("archived_at")
 
-  organizationId    String   @map("organization_id")
+  organizationId    String    @map("organization_id")
   organization      Organization @relation(fields: [organizationId], references: [id])
 
-  supplierId        String?  @map("supplier_id")
-  supplier          Supplier? @relation(fields: [supplierId], references: [id])
+  supplierId        String?   @map("supplier_id")
+  supplier          Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
 
   stockMovements    StockMovement[]
+  stockMovementRequests StockMovementRequest[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@unique([organizationId, sku]) 
+  @@index([organizationId, archivedAt])
+  @@index([organizationId, supplierId])
   @@map("products")
 }
 
@@ -236,21 +246,58 @@ model Supplier {
   @@map("suppliers")
 }
 
+model StockMovementRequest {
+  id             String         @id @default(cuid())
+  type           MovementType
+  quantity       Int            // as submitted, same meaning as RecordMovementDTO
+  reason         String?
+  note           String?
+  status         RequestStatus  @default(PENDING)
+  decisionNote   String?        @map("decision_note")
+  decidedAt      DateTime?      @map("decided_at")
+
+  organizationId String         @map("organization_id")
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  productId      String         @map("product_id")
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  requestedById  String         @map("requested_by_id")
+  requestedBy    User           @relation("RequestedMovements", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedById    String?        @map("decided_by_id")
+  decidedBy      User?          @relation("DecidedMovements", fields: [decidedById], references: [id], onDelete: SetNull)
+  movementId     String?        @unique @map("movement_id")
+  movement       StockMovement? @relation(fields: [movementId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([organizationId, status, createdAt])
+  @@index([requestedById, createdAt])
+  @@map("stock_movement_requests")
+}
+
 model StockMovement {
-  id            String        @id @default(cuid())
-  type          MovementType  // IN, OUT, ADJUSTMENT
-  quantity      Int           // how many units moved
-  reason        String?       // why it happened
-  note          String?       // extra context
+  id             String       @id @default(cuid())
+  type           MovementType
+  delta          Int          // signed: + adds stock, - removes it
+  stockAfter     Int          @map("stock_after")   // balance right after this row
+  reason         String?
+  note           String?
 
-  productId     String        @map("product_id")
-  product       Product @relation(fields: [productId], references: [id])
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
-  performedById String        @map("performed_by_id")
-  performedBy   User @relation(fields: [performedById], references: [id])
+  productId      String       @map("product_id")
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  createdAt     DateTime @default(now()) @map("created_at")
+  performedById  String       @map("performed_by_id")
+  performedBy    User         @relation(fields: [performedById], references: [id], onDelete: Restrict)
 
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  stockMovementRequests StockMovementRequest[]
+
+  @@index([organizationId, createdAt])
+  @@index([productId, createdAt])
   @@map("stock_movements")
 }
 
@@ -318,9 +365,17 @@ enum AuthProvider {
 }
 
 enum MovementType {
+  INITIAL
   IN
   OUT
   ADJUSTMENT
+}
+
+enum RequestStatus { 
+  PENDING 
+  APPROVED 
+  REJECTED 
+  CANCELLED 
 }
 
 enum NotificationType {
@@ -328,4 +383,6 @@ enum NotificationType {
   LOW_STOCK
   STOCK_MOVEMENT
   PAYMENT_FAILED
+  MOVEMENT_REQUESTED
+  MOVEMENT_DECIDED
 }
