@@ -11,16 +11,49 @@ export class NotificationService {
     private readonly notificationGateway: NotificationGateway,
   ) {}
 
-  async createAndEmit(data: CreateNotificationDTO) {
+  async createAndEmit(data: CreateNotificationDTO, to: string = 'org') {
     const notification = await this.notificationRepo.create(data);
 
-    this.notificationGateway.emitToOrg(
-      data.organizationId,
-      data.type ? data.type : 'notification',
-      {
-        ...notification,
-      },
-    );
+    switch (to) {
+      case 'org':
+        this.notificationGateway.emitToOrg(
+          data.organizationId,
+          data.type ? data.type : 'notification',
+          {
+            ...notification,
+          },
+        );
+        break;
+      case 'user':
+        this.notificationGateway.emitToUser(
+          data.userId,
+          data.type ? data.type : 'notification',
+          {
+            ...notification,
+          },
+        );
+        break;
+      case 'org manager and owner':
+        this.notificationGateway.emitToOrgManagerOwner(
+          data.organizationId,
+          data.userId,
+          data.type ? data.type : 'notification',
+          {
+            ...notification,
+          },
+        );
+        break;
+
+      default:
+        this.notificationGateway.emitToOrg(
+          data.organizationId,
+          data.type ? data.type : 'notification',
+          {
+            ...notification,
+          },
+        );
+        break;
+    }
 
     return notification;
   }

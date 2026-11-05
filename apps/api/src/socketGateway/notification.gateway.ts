@@ -74,6 +74,12 @@ export class NotificationGateway
         await client.join(`org:${orgId}`);
         console.log(`Client ${client.id} joined room -> org:${orgId}`);
         await client.join(`org:${orgId}:${role.toLowerCase()}`);
+        await client.join(`org:${orgId}:${role.toLowerCase()}`);
+        await client.join(`org:${orgId}:${role.toLowerCase()}:${userId}`);
+        await client.join(`org:${orgId}:${role.toLowerCase()}:${userId}`);
+        console.log(
+          `Client ${client.id} joined room -> org:${orgId}:${role.toLowerCase()}`,
+        );
       }
       await client.join(`user:${userId}`);
     } catch (error) {
@@ -94,6 +100,20 @@ export class NotificationGateway
 
   emitToOrg(orgId: string, event: string, data: unknown) {
     this.server.to(`org:${orgId}`).emit(event, data);
+  }
+
+  emitToOrgManagerOwner(
+    orgId: string,
+    userId: string,
+    event: string,
+    data: unknown,
+  ) {
+    this.server.to(`org:${orgId}:owner:${userId}`).emit(event, data);
+    this.server.to(`org:${orgId}:manager:${userId}`).emit(event, data);
+  }
+
+  emitToUser(userId: string, event: string, data: unknown) {
+    this.server.to(`user:${userId}`).emit(event, data);
   }
 
   testSocket(orgId: string, event: string, data: unknown) {
