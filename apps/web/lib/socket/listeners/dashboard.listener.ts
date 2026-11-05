@@ -9,10 +9,7 @@ import {
   revalidateStockMovementCache,
   revalidateStockMovementRequestsCache,
 } from "@/actions/revalidateAction";
-import {
-  getNotificationHref,
-  type NotificationType,
-} from "@/utils/getNotificationLinks";
+import { getNotificationHref } from "@/utils/getNotificationLinks";
 
 interface SocketNotificationData {
   message: string;
@@ -79,7 +76,7 @@ export function dashboardListener(
       } catch (error) {
         console.error(`Failed to clear caches for ${event}:`, error);
       } finally {
-        router.refresh(); 
+        router.refresh();
       }
     };
 
