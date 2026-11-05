@@ -1,6 +1,11 @@
 // user.repository.ts
 
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 
 // Services
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
@@ -10,6 +15,7 @@ import {
   SaveOrgOnboardingDTO,
 } from './user.dto';
 import { InviteRole } from 'generated/prisma/enums';
+import { ChangePasswordDTO, UpdateProfileDTO } from './settings.dto';
 
 @Injectable()
 export class UserRepository {
@@ -120,5 +126,82 @@ export class UserRepository {
       });
       return { user, userInfo };
     });
+  }
+
+  async updateUserInfo(userId: string, data: UpdateProfileDTO) {
+    const payload = {
+      firstName: data.firstName,
+      middleName: data.middleName ?? null,
+      lastName: data.lastName,
+      suffix: data.suffix ?? null,
+      phone: data.phone ?? null,
+    };
+    return this.prisma.userInfo.upsert({
+      where: { userId },
+      update: payload,
+      create: { userId, ...payload },
+      select: {
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        suffix: true,
+        phone: true,
+      },
+    });
+  }
+
+  async securityInfo(userId: string) {
+    const [user, activeSessions] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { authProvider: true, password: true },
+      }),
+      this.prisma.session.count({
+        where: { userId, isValid: true, expiresAt: { gt: new Date() } },
+      }),
+    ]);
+    if (!user) throw new NotFoundException('User not found.');
+    return {
+      authProvider: user.authProvider,
+      hasPassword: !!user.password,
+      activeSessions,
+    };
+  }
+
+  async updatePassword(
+    userId: string,
+    currentToken: string,
+    dto: ChangePasswordDTO,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { password: true },
+    });
+    if (!user) throw new NotFoundException('User not found.');
+    if (!user.password) {
+      throw new BadRequestException(
+        'Your account signs in with Google or GitHub, so it has no password to change.',
+      );
+    }
+    if (!(await bcrypt.compare(dto.currentPassword, user.password))) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException(
+        'Your new password must be different from the current one.',
+      );
+    }
+
+    const hash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { password: hash },
+      }),
+      this.prisma.session.updateMany({
+        where: { userId, isValid: true, token: { not: currentToken } },
+        data: { isValid: false },
+      }),
+    ]);
   }
 }

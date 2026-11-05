@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -17,6 +18,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { PermissionsGuard } from 'src/guards/permission.guard';
@@ -28,6 +30,7 @@ import {
   OrgInviteResponseDto,
   OrgMemberResponseDto,
   SendInviteEmailDTO,
+  UpdateOrganizationDTO,
   ValidateInviteResponseDTO,
 } from './organization.dto';
 import type { AuthenticatedRequest } from 'src/types/request';
@@ -395,5 +398,52 @@ export class OrganizationController {
   ) {
     await this.orgService.acceptInvite(token, req.user.userId);
     return ApiResponseShaper.success(null, 'You have joined the organization.');
+  }
+
+  @ApiOperation({
+    summary: 'Update organization details',
+    description:
+      'Updates the metadata and settings of the organization associated with the logged-in user. Access depends on the user type privileges.',
+  })
+  @ApiBody({ type: UpdateOrganizationDTO })
+  @ApiResponse({
+    status: 200,
+    description: 'Organization updated successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Organization updated successfully',
+        },
+        data: { $ref: '#/components/schemas/OrganizationResponseDTO' }, // Adjust if your service returns a different schema name
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request. Validation errors encountered in payload DTO.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized access token missing or expired.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden access resource permissions error.',
+  })
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @Patch('me')
+  async updateMyOrganization(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateOrganizationDTO,
+  ) {
+    const org = await this.orgService.updateMyOrganization(
+      req.user.organizationId!,
+      req.user.userType,
+      dto,
+    );
+    return ApiResponseShaper.success(org, 'Organization updated successfully');
   }
 }

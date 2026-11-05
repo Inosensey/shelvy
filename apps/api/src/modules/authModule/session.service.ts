@@ -31,4 +31,14 @@ export class SessionService {
   async invalidateAllUserSessions(userId: string): Promise<void> {
     await this.authRepository.invalidateAllUserSessions(userId);
   }
+
+  async revokeAllUserSessions(
+    userId: string,
+    currentToken: string,
+  ): Promise<number> {
+    return await this.authRepository.revokeAllUserSessions(
+      userId,
+      currentToken,
+    );
+  }
 }

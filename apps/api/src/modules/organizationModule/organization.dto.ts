@@ -12,6 +12,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { InviteRole } from 'src/mail/templates/inviteMember.template';
 import { InviteStatus } from 'generated/prisma/enums';
 import { UserInfoResponseDTO } from '../usersModule/user.dto';
+import { emptyToNull } from '../supplierModule/supplier.dto';
 
 export class CreateOrganizationDTO {
   @ApiProperty({ example: 'Acme Corp' })
@@ -29,6 +30,22 @@ export class CreateOrganizationDTO {
   @MaxLength(255, { message: 'Description cannot exceed 255 characters.' })
   @Transform(({ value }: { value?: string }) => value?.trim())
   description?: string;
+}
+
+export class UpdateOrganizationDTO {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  @Transform(({ value }: { value: string }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  name!: string;
+
+  @IsOptional()
+  @emptyToNull()
+  @IsString()
+  @MaxLength(500)
+  description?: string | null;
 }
 
 export class OrganizationResponseDTO {

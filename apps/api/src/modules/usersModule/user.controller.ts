@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -40,6 +41,7 @@ import { CreateOrganizationDTO } from '../organizationModule/organization.dto';
 // types
 import type { AuthenticatedRequest } from 'src/types/request';
 import { AllowWithoutOrganization } from 'src/decorators/allowWithoutOrg.decorator';
+import { ChangePasswordDTO, UpdateProfileDTO } from './settings.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -273,6 +275,130 @@ export class UserController {
     return ApiResponseShaper.success(
       result,
       'Member onboarding completed successfully',
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Get security info for the current user',
+    description:
+      'Retrieves security-related configurations for the logged-in user, such as 2FA status, last password change date, and active sessions.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Security information retrieved successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Security info retrieved successfully',
+        },
+        data: {
+          type: 'object',
+          properties: {
+            twoFactorEnabled: { type: 'boolean', example: false },
+            passwordLastChanged: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-11-05T10:13:00.000Z',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized access token missing or expired.',
+  })
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @Get('me/security')
+  async getSecurity(@Req() req: AuthenticatedRequest) {
+    const data = await this.userService.getSecurityInfo(req.user.userId);
+    return ApiResponseShaper.success(
+      data,
+      'Security info retrieved successfully',
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Update personal profile details',
+    description:
+      'Updates descriptive profile metadata for the authenticated user, such as name or contact details.',
+  })
+  @ApiBody({ type: UpdateProfileDTO })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Profile updated successfully' },
+        data: { $ref: '#/components/schemas/UserResponseDTO' }, // Adjust if your service returns a different schema
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request. Validation errors encountered in payload DTO.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized access token missing or expired.',
+  })
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @Patch('me/info')
+  async updateMyInfo(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateProfileDTO,
+  ) {
+    const data = await this.userService.updateUserInfo(req.user.userId, dto);
+    return ApiResponseShaper.success(data, 'Profile updated successfully');
+  }
+
+  @ApiOperation({
+    summary: 'Change account password',
+    description:
+      'Modifies the user password after verifying their old credentials. Invalidates other active login sessions.',
+  })
+  @ApiBody({ type: ChangePasswordDTO })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed. Other devices were signed out.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Password changed. Other devices were signed out.',
+        },
+        data: { type: 'object', nullable: true, example: null },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request. Current password verification failed or criteria unmet.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized access token missing or expired.',
+  })
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @Patch('me/password')
+  async updatePassword(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: ChangePasswordDTO,
+  ) {
+    const token = req.cookies?.token as string;
+    await this.userService.updatePassword(req.user.userId, token, dto);
+    return ApiResponseShaper.success(
+      null,
+      'Password changed. Other devices were signed out.',
     );
   }
 }

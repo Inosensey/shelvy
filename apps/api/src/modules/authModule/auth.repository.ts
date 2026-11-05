@@ -108,4 +108,12 @@ export class AuthRepository {
       },
     });
   }
+
+  async revokeAllUserSessions(userId: string, currentToken: string) {
+    const { count } = await this.prisma.session.updateMany({
+      where: { userId, isValid: true, token: { not: currentToken } },
+      data: { isValid: false },
+    });
+    return count;
+  }
 }

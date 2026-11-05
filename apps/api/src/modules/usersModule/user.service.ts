@@ -22,6 +22,7 @@ import { NotificationService } from '../notificationModule/notification.service'
 import { CreateNotificationDTO } from '../notificationModule/notification.dto';
 import { NotificationType } from 'generated/prisma/enums';
 import { AuthenticatedRequest } from 'src/types/request';
+import { ChangePasswordDTO, UpdateProfileDTO } from './settings.dto';
 
 @Injectable()
 export class UserService {
@@ -107,5 +108,21 @@ export class UserService {
     await this.notificationService.createAndEmit(notificationPayload);
 
     return memberOnboardingResult;
+  }
+
+  async getSecurityInfo(userId: string) {
+    return await this.UserRepo.securityInfo(userId);
+  }
+
+  async updateUserInfo(userId: string, data: UpdateProfileDTO) {
+    return await this.UserRepo.updateUserInfo(userId, data);
+  }
+
+  async updatePassword(
+    userId: string,
+    currentToken: string,
+    dto: ChangePasswordDTO,
+  ) {
+    return await this.UserRepo.updatePassword(userId, currentToken, dto);
   }
 }

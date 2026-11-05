@@ -11,6 +11,7 @@ import { OrganizationRepository } from './organization.repository';
 import {
   CreateOrganizationDTO,
   SendInviteEmailDTO,
+  UpdateOrganizationDTO,
   ValidateInviteResponseDTO,
 } from './organization.dto';
 import { NodemailerService } from 'src/NodemailerConfig/Nodemailer.service';
@@ -19,6 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import { differenceInHours } from 'date-fns';
 import { AuthenticatedRequest } from 'src/types/request';
 import { NotificationService } from '../notificationModule/notification.service';
+import { Role } from 'generated/prisma/enums';
 
 @Injectable()
 export class OrganizationService {
@@ -182,5 +184,13 @@ export class OrganizationService {
 
   async getPendingInviteRecordsByOrganizationId(organizationId: string) {
     return this.orgRepo.getPendingInviteRecordsByOrganizationId(organizationId);
+  }
+
+  async updateMyOrganization(
+    organizationId: string,
+    role: Role,
+    dto: UpdateOrganizationDTO,
+  ) {
+    return this.orgRepo.updateMyOrganization(organizationId, role, dto);
   }
 }

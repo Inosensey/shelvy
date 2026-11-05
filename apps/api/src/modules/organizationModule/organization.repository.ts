@@ -10,7 +10,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
-import { CreateOrganizationDTO } from './organization.dto';
+import {
+  CreateOrganizationDTO,
+  UpdateOrganizationDTO,
+} from './organization.dto';
 import { InviteRole, NotificationType, Role } from 'generated/prisma/enums';
 import { NodemailerService } from 'src/NodemailerConfig/Nodemailer.service';
 import { UserService } from '../usersModule/user.service';
@@ -422,6 +425,18 @@ export class OrganizationRepository {
       include: {
         users: true,
       },
+    });
+  }
+  async updateMyOrganization(
+    organizationId: string,
+    role: Role,
+    dto: UpdateOrganizationDTO,
+  ) {
+    if (role !== Role.OWNER)
+      throw new ForbiddenException('Only the owner can edit the organization.');
+    return this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { name: dto.name, description: dto.description ?? null },
     });
   }
 }

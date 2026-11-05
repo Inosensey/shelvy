@@ -178,4 +178,54 @@ export class AuthController {
     const ticket = this.authService.createSocketTicket(req);
     return ApiResponseShaper.success({ ticket }, 'Socket ticket issued');
   }
+
+  @ApiOperation({
+    summary: 'Revoke all other active sessions',
+    description:
+      'Terminates all active login sessions for the current user across other devices, except for the current session token.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Other sessions successfully revoked or no other active sessions found.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Signed out of 2 other device(s).',
+        },
+        data: {
+          type: 'object',
+          properties: {
+            count: {
+              type: 'number',
+              description: 'The number of active sessions that were closed.',
+              example: 2,
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized access token missing or expired.',
+  })
+  @Post('sessions/revoke-others')
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  async revokeAllUserSessions(@Req() req: AuthenticatedRequest) {
+    const count = await this.sessionService.revokeAllUserSessions(
+      req.user.userId,
+      req.cookies?.token as string,
+    );
+    return ApiResponseShaper.success(
+      { count },
+      count
+        ? `Signed out of ${count} other device(s).`
+        : 'No other devices were signed in.',
+    );
+  }
 }
