@@ -107,6 +107,45 @@ class NestJsEndpoints {
     }
   }
 
+  async requestWithRawResponse(
+    endpoint: string,
+    options: RequestInit = {},
+    interceptResponse: boolean = false,
+  ) {
+    try {
+      const isServer = typeof window === "undefined";
+
+      const headers = new Headers(this.getHeaders());
+      new Headers(options.headers).forEach((value, key) =>
+        headers.set(key, value),
+      );
+
+      if (options.body instanceof FormData) headers.delete("content-type");
+
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+        ...(isServer ? {} : { credentials: "include" as RequestCredentials }),
+        mode: "cors",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log(errorData.message || `HTTP ${response.status}`);
+        return null;
+      }
+
+      if (interceptResponse && this.responseInterceptor) {
+        await this.responseInterceptor(response.headers);
+      }
+
+      return response;
+    } catch (error) {
+      console.log(error instanceof Error ? error.message : "Network error");
+      return null;
+    }
+  }
+
   // Auth API
   authApi = {
     freeTierSignUp: async (data: {
@@ -403,8 +442,292 @@ class NestJsEndpoints {
       return response;
     },
   };
+  supplierApi = {
+    getSuppliers: async (params: {
+      search?: string;
+      page?: number;
+      pageSize?: number;
+    }): Promise<ApiResponse<PaginatedResponse<Supplier> | null>> => {
+      await this.initFromCookies();
+      const searchParams = new URLSearchParams();
+      if (params.search) searchParams.set("search", params.search);
+      if (params.page) searchParams.set("page", String(params.page));
+      if (params.pageSize)
+        searchParams.set("pageSize", String(params.pageSize));
+      return this.request(`/suppliers?${searchParams.toString()}`, {
+        next: { tags: ["suppliers"] },
+      });
+    },
+    getSupplierOptions: async (): Promise<
+      ApiResponse<SupplierOption[] | null>
+    > => {
+      await this.initFromCookies();
+      return this.request("/suppliers/options");
+    },
+    createSupplier: async (
+      data: SupplierInput,
+    ): Promise<ApiResponse<Supplier | null>> => {
+      await this.initFromCookies();
+      return this.request("/suppliers", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    updateSupplier: async (
+      id: string,
+      data: SupplierInput,
+    ): Promise<ApiResponse<Supplier | null>> => {
+      await this.initFromCookies();
+      return this.request(`/suppliers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    deleteSupplier: async (id: string): Promise<ApiResponse<string | null>> => {
+      await this.initFromCookies();
+      return this.request(`/suppliers/${id}`, { method: "DELETE" });
+    },
+  };
 
   // Products API
+  productApi = {
+    getProducts: async (params: {
+      search?: string;
+      supplierId?: string;
+      lowStock?: boolean;
+      archived?: boolean;
+      page?: number;
+      pageSize?: number;
+    }): Promise<ApiResponse<PaginatedResponse<Product> | null>> => {
+      await this.initFromCookies();
+      const searchParams = new URLSearchParams();
+      if (params.search) searchParams.set("search", params.search);
+      if (params.supplierId) searchParams.set("supplierId", params.supplierId);
+      if (params.lowStock) searchParams.set("lowStock", "true");
+      if (params.archived) searchParams.set("archived", "true");
+      if (params.page) searchParams.set("page", String(params.page));
+      if (params.pageSize)
+        searchParams.set("pageSize", String(params.pageSize));
+      return this.request(`/products?${searchParams.toString()}`, {
+        next: { tags: ["products"] },
+      });
+    },
+    getProduct: async (
+      id: string,
+    ): Promise<ApiResponse<ProductDetail | null>> => {
+      await this.initFromCookies();
+      return this.request(`/products/${id}`, {
+        next: { tags: ["product", `product-${id}`] },
+      });
+    },
+    getProductOptions: async (): Promise<
+      ApiResponse<ProductOption[] | null>
+    > => {
+      await this.initFromCookies();
+      return this.request("/products/options");
+    },
+    suggestSku: async (name: string): Promise<ApiResponse<string | null>> => {
+      await this.initFromCookies();
+      return this.request(
+        `/products/sku/suggestion?name=${encodeURIComponent(name)}`,
+      );
+    },
+    createProduct: async (
+      data: Record<string, unknown>,
+    ): Promise<ApiResponse<Product | null>> => {
+      await this.initFromCookies();
+      return this.request("/products", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    updateProduct: async (
+      id: string,
+      data: Record<string, unknown>,
+    ): Promise<ApiResponse<Product | null>> => {
+      await this.initFromCookies();
+      return this.request(`/products/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    setArchived: async (
+      id: string,
+      archived: boolean,
+    ): Promise<ApiResponse<string | null>> => {
+      await this.initFromCookies();
+      return this.request(
+        `/products/${id}/${archived ? "archive" : "unarchive"}`,
+        { method: "PATCH" },
+      );
+    },
+    export: async (path: string): Promise<Response | null> => {
+      await this.initFromCookies();
+      const response = await this.requestWithRawResponse(path);
+      console.log("response:", response);
+      return response;
+    },
+    postForm: async (
+      path: string,
+      formData: FormData,
+    ): Promise<Response | null> => {
+      await this.initFromCookies();
+      const headers = new Headers(this.getHeaders() as HeadersInit);
+      headers.delete("content-type");
+
+      return this.requestWithRawResponse(path, {
+        method: "POST",
+        headers,
+        body: formData,
+        cache: "no-store",
+      });
+    },
+  };
+  stockMovementsApi = {
+    getMovements: async (params: {
+      productId?: string;
+      type?: string;
+      from?: string;
+      to?: string;
+      page?: number;
+      pageSize?: number;
+    }): Promise<ApiResponse<PaginatedResponse<StockMovement> | null>> => {
+      await this.initFromCookies();
+      const searchParams = new URLSearchParams();
+      (["productId", "type", "from", "to"] as const).forEach(
+        (k) => params[k] && searchParams.set(k, params[k]!),
+      );
+      if (params.page) searchParams.set("page", String(params.page));
+      if (params.pageSize)
+        searchParams.set("pageSize", String(params.pageSize));
+      return this.request(`/stock-movements?${searchParams.toString()}`, {
+        next: { tags: ["stockMovements"] },
+      });
+    },
+    recordMovement: async (
+      data: Record<string, unknown>,
+    ): Promise<ApiResponse<StockMovement | null>> => {
+      await this.initFromCookies();
+      return this.request("/stock-movements", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    getMovementPage: async (
+      id: string,
+      pageSize: number,
+    ): Promise<ApiResponse<{ page: number } | null>> => {
+      await this.initFromCookies();
+      return this.request(`/stock-movements/${id}/page?pageSize=${pageSize}`);
+    },
+    export: async (path: string): Promise<Response | null> => {
+      await this.initFromCookies();
+      const response = await this.requestWithRawResponse(path);
+      return response;
+    },
+  };
+  stockMovementRequestApi = {
+    getRequests: async (params: {
+      status?: string;
+      page?: number;
+      pageSize?: number;
+    }): Promise<ApiResponse<PaginatedResponse<MovementRequest> | null>> => {
+      await this.initFromCookies();
+      const searchParams = new URLSearchParams();
+      if (params.status) searchParams.set("status", params.status);
+      if (params.page) searchParams.set("page", String(params.page));
+      if (params.pageSize)
+        searchParams.set("pageSize", String(params.pageSize));
+      return this.request(
+        `/stock-movement-requests?${searchParams.toString()}`,
+        {
+          next: { tags: ["stockMovementRequests"] },
+        },
+      );
+    },
+    createRequest: async (
+      data: Record<string, unknown>,
+    ): Promise<ApiResponse<MovementRequest | null>> => {
+      await this.initFromCookies();
+      return this.request("/stock-movement-requests", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    decide: async (
+      id: string,
+      decision: "approve" | "reject",
+      decisionNote: string,
+    ): Promise<ApiResponse<MovementRequest | null>> => {
+      await this.initFromCookies();
+      return this.request(`/stock-movement-requests/${id}/${decision}`, {
+        method: "PATCH",
+        body: JSON.stringify({ decisionNote }),
+      });
+    },
+    cancelRequest: async (id: string): Promise<ApiResponse<string | null>> => {
+      await this.initFromCookies();
+      return this.request(`/stock-movement-requests/${id}`, {
+        method: "DELETE",
+      });
+    },
+  };
+  dashboardApi = {
+    getOverview: async (): Promise<ApiResponse<DashboardOverview | null>> => {
+      await this.initFromCookies();
+      return this.request("/dashboard/overview", {
+        next: { tags: ["dashboardOverview"] },
+      });
+    },
+  };
+  settingsApi = {
+    getProfile: async (): Promise<ApiResponse<UserInfo | null>> => {
+      await this.initFromCookies();
+      return this.request("/users/me/info");
+    },
+    getSecurity: async (): Promise<ApiResponse<SecurityInfo | null>> => {
+      await this.initFromCookies();
+      return this.request("/users/me/security");
+    },
+    getOrganization: async (): Promise<ApiResponse<MyOrganization | null>> => {
+      await this.initFromCookies();
+      return this.request("/organizations/me");
+    },
+    updateProfile: async (
+      data: Record<string, unknown>,
+    ): Promise<ApiResponse<UserInfo | null>> => {
+      await this.initFromCookies();
+      return this.request("/users/me/info", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    changePassword: async (data: {
+      currentPassword: string;
+      newPassword: string;
+    }): Promise<ApiResponse<null>> => {
+      await this.initFromCookies();
+      return this.request("/users/me/password", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    revokeOtherSessions: async (): Promise<
+      ApiResponse<{ count: number } | null>
+    > => {
+      await this.initFromCookies();
+      return this.request("/auth/sessions/revoke-others", { method: "POST" });
+    },
+    updateOrganization: async (
+      data: Record<string, unknown>,
+    ): Promise<ApiResponse<MyOrganization | null>> => {
+      await this.initFromCookies();
+      return this.request("/organizations/me", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+  };
 }
 
 export const nestJsEndpoints = new NestJsEndpoints();
