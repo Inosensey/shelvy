@@ -1,7 +1,7 @@
 // components/dashboard/notifications/NotificationItem.tsx
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Users, AlertTriangle, ArrowLeftRight, CreditCard } from "lucide-react";
+import { Users, AlertTriangle, ArrowLeftRight, CreditCard, ClipboardList, ClipboardCheck } from "lucide-react";
 import { getNotificationHref } from "@/utils/getNotificationLinks";
 
 const TYPE_ICON = {
@@ -9,18 +9,12 @@ const TYPE_ICON = {
   LOW_STOCK: AlertTriangle,
   STOCK_MOVEMENT: ArrowLeftRight,
   PAYMENT_FAILED: CreditCard,
+  MOVEMENT_REQUESTED: ClipboardList,
+  MOVEMENT_DECIDED: ClipboardCheck, 
 } as const;
 
 interface NotificationItemProps {
-  notification: {
-    id: string;
-    type: keyof typeof TYPE_ICON;
-    title: string;
-    message: string;
-    isRead: boolean;
-    createdAt: string;
-    metadata: { productId?: string; stockMovementId?: string } | null;
-  };
+  notification: NotificationWithMetadata;
   onNavigate: () => void;
 }
 

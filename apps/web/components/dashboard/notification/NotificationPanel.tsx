@@ -20,7 +20,6 @@ export function NotificationPanel({ open, notifications, onClose, onOpenMarkRead
     markAllNotificationsRead();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
   return (
     <AnimatePresence>
       {open && (

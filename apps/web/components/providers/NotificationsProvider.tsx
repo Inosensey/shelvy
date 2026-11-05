@@ -1,7 +1,7 @@
 // components/providers/NotificationsProvider.tsx
 "use client";
 
-import { memberJoinedListener } from "@/lib/socket/listeners/memberJoin.listener";
+import { dashboardListener } from "@/lib/socket/listeners/dashboard.listener";
 import {
   createContext,
   useContext,
@@ -41,7 +41,11 @@ export function NotificationsProvider({
   }, []);
 
   useEffect(() => {
-    const { cleanUp } = memberJoinedListener(socket, router);
+    setNotifications(initialNotifications);
+  }, [initialNotifications]);
+
+  useEffect(() => {
+    const { cleanUp } = dashboardListener(socket, router);
 
     return cleanUp;
   }, [socket, router]);
