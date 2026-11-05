@@ -37,14 +37,34 @@ export class PermissionsGuard implements CanActivate {
       OWNER: ['CREATE', 'READ', 'UPDATE', 'DELETE', 'MANAGE_ROLES'],
     },
     products: {
-      OWNER: ['CREATE', 'READ', 'UPDATE', 'MANAGE_ROLES'],
-      MANAGER: ['CREATE', 'READ', 'UPDATE'],
-      STAFF: ['CREATE', 'READ', 'DELETE', 'UPDATE'],
+      OWNER: ['CREATE', 'READ', 'UPDATE', 'DELETE'],
+      MANAGER: ['CREATE', 'READ', 'UPDATE', 'DELETE'],
+      STAFF: ['READ'],
+    },
+    suppliers: {
+      OWNER: ['CREATE', 'READ', 'UPDATE', 'DELETE'],
+      MANAGER: ['CREATE', 'READ', 'UPDATE', 'DELETE'],
+      STAFF: ['READ'],
     },
     notifications: {
       OWNER: ['READ', 'UPDATE'],
       MANAGER: ['READ', 'UPDATE'],
       STAFF: ['READ', 'UPDATE'],
+    },
+    'stock-movement': {
+      OWNER: ['CREATE', 'READ'],
+      MANAGER: ['CREATE', 'READ'],
+      STAFF: ['READ'],
+    },
+    'stock-movement-requests': {
+      OWNER: ['CREATE', 'READ', 'UPDATE', 'DELETE'],
+      MANAGER: ['CREATE', 'READ', 'UPDATE', 'DELETE'],
+      STAFF: ['CREATE', 'READ', 'DELETE'],
+    },
+    dashboard: {
+      OWNER: ['READ'],
+      MANAGER: ['READ'],
+      STAFF: ['READ'],
     },
     // Default/fallback permissions
     default: {

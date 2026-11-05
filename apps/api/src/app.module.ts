@@ -11,14 +11,24 @@ import { OrganizationModule } from './modules/organizationModule/organization.mo
 import { NodemailerModule } from './NodemailerConfig/Nodemailer.module';
 import { SocketGatewayModule } from './socketGateway/gateway.module';
 import { NotificationModule } from './modules/notificationModule/notification.module';
+import { SupplierModule } from './modules/supplierModule/supplier.module';
+import { ProductModule } from './modules/productModule/product.module';
+import { StockMovementModule } from './modules/stockMovementModule/stockMovement.module';
+import { StockMovementRequestModule } from './modules/stockMovementRequestModule/stockMovementRequest.module';
+import { DashboardModule } from './modules/dashboardModule/dashboard.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
+    DashboardModule,
     AuthModule,
     UserModule,
     OrganizationModule,
+    SupplierModule,
+    ProductModule,
+    StockMovementModule,
+    StockMovementRequestModule,
     StripeModule,
     SubscriptionModule,
     NodemailerModule,
