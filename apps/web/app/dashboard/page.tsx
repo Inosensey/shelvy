@@ -1,82 +1,82 @@
+import { AlertTriangle, ClipboardList, Package, Wallet } from "lucide-react";
 import { DashboardTopbar } from "@/components/dashboard/DashboardTopbar";
-import { StatsOverview } from "@/components/dashboard/StatsOverview";
-import {
-  RecentMovementsList,
-  type Movement,
-} from "@/components/dashboard/RecentMovementsList";
-import { QuickActions } from "@/components/dashboard/QuickActions";
+import { StatCard } from "@/components/dashboard/overview/StatCard";
+import { LowStockPanel } from "@/components/dashboard/overview/LowStockPanel";
+import { RecentMovementsPanel } from "@/components/dashboard/overview/RecentMovementPanel";
+import { ActivityChart } from "@/components/dashboard/overview/ActivityChart";
+import { nestJsEndpoints } from "@/lib/nestJsEndpoints";
+import { helpers } from "@/lib/helpers";
 
-const getOverviewData = async () => {
-  const recentMovements: Movement[] = [
-    {
-      id: "1",
-      productName: "Wireless Mouse",
-      type: "OUT",
-      quantity: 5,
-      reason: "Order #1042",
-      performedBy: "Jane",
-      when: "12m ago",
-    },
-    {
-      id: "2",
-      productName: "USB-C Cable",
-      type: "IN",
-      quantity: 100,
-      reason: "Restock",
-      performedBy: "Owner",
-      when: "2h ago",
-    },
-    {
-      id: "3",
-      productName: "Mechanical Keyboard",
-      type: "ADJUSTMENT",
-      quantity: 2,
-      reason: "Damaged units",
-      performedBy: "Jane",
-      when: "5h ago",
-    },
-    {
-      id: "4",
-      productName: "Monitor Stand",
-      type: "OUT",
-      quantity: 3,
-      reason: "Order #1038",
-      performedBy: "Owner",
-      when: "1d ago",
-    },
-    {
-      id: "5",
-      productName: "USB-C Cable",
-      type: "OUT",
-      quantity: 20,
-      reason: "Order #1035",
-      performedBy: "Jane",
-      when: "1d ago",
-    },
-  ];
+const peso = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  maximumFractionDigits: 0,
+});
+const num = new Intl.NumberFormat("en-PH");
 
-  return {
-    stats: {
-      totalProducts: 24,
-      lowStockCount: 3,
-      stockValue: 184500,
-      suppliersCount: 6,
-    },
-    recentMovements,
-  };
-};
+export default async function DashboardPage() {
+  const [currentUser, response] = await Promise.all([
+    helpers.getCurrentUserOrNull(),
+    nestJsEndpoints.dashboardApi.getOverview(),
+  ]);
 
-export default async function DashboardOverviewPage() {
-  const { stats, recentMovements } = await getOverviewData();
+  const data = response.success && response.data ? response.data : null;
+  const isStaff = currentUser?.role === "STAFF";
 
   return (
     <>
-      <DashboardTopbar title="Dashboard" />
-      <main className="flex flex-col gap-6 px-4 py-8 sm:px-8">
-        <StatsOverview {...stats} />
-        <QuickActions />
-        <RecentMovementsList movements={recentMovements} />
-      </main>
+      <DashboardTopbar title="Overview" />
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        {!data ? (
+          <p className="text-sm text-red-400">
+            {response.message || "Could not load the overview."}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatCard
+                label="Active products"
+                value={num.format(data.kpis.activeProducts)}
+                hint={`${num.format(data.kpis.totalUnits)} units in stock`}
+                icon={Package}
+                href="/dashboard/products"
+              />
+              <StatCard
+                label="Stock value"
+                value={peso.format(data.kpis.stockValue)}
+                hint="Price × units on hand"
+                icon={Wallet}
+              />
+              <StatCard
+                label="Low stock"
+                value={num.format(data.kpis.lowStockCount)}
+                hint={
+                  data.kpis.lowStockCount === 0
+                    ? "All good"
+                    : "Needs restocking"
+                }
+                icon={AlertTriangle}
+                tone={data.kpis.lowStockCount > 0 ? "warning" : "default"}
+                href="/dashboard/products?lowStock=true"
+              />
+              <StatCard
+                label={isStaff ? "My pending requests" : "Pending requests"}
+                value={num.format(data.kpis.pendingRequests)}
+                hint={isStaff ? "Waiting for a manager" : "Waiting for review"}
+                icon={ClipboardList}
+                href="/dashboard/stock-movements/requests?status=PENDING"
+              />
+            </div>
+
+            <ActivityChart data={data.activity} />
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <LowStockPanel items={data.lowStock} />
+              <RecentMovementsPanel movements={data.recentMovements} />
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 }
