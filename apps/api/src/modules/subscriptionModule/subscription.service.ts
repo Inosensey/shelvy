@@ -7,23 +7,71 @@ import {
   SubscriptionStatus,
 } from 'generated/prisma/client';
 import Stripe from 'stripe';
+import { invoiceSubscriptionId } from 'src/utils/stripe.util';
 
 @Injectable()
 export class SubscriptionService {
   constructor(private readonly subscriptionRepo: SubscriptionRepository) {}
 
-  async createSubscription(data: {
+  async activateSubscription(data: {
     userId: string;
     plan: SubscriptionPlan;
-    status: SubscriptionStatus;
-    stripeSubscriptionId?: string;
-    stripeCustomerId?: string;
-    stripePriceId?: string;
-    currentPeriodStart?: Date;
-    currentPeriodEnd?: Date;
+    status?: SubscriptionStatus;
+    amount: number;
+    stripeSubscriptionId: string;
+    stripeCustomerId: string;
+    stripePriceId: string;
+    currentPeriodStart: Date;
+    currentPeriodEnd: Date;
     nextPaymentDate?: Date;
   }) {
-    return this.subscriptionRepo.create(data);
+    return this.subscriptionRepo.activate(data);
+  }
+
+  async recordInvoice(invoice: Stripe.Invoice, failed = false) {
+    const stripeSubId = invoiceSubscriptionId(invoice);
+    if (!stripeSubId || !invoice.id) return null;
+    const sub =
+      await this.subscriptionRepo.findByStripeSubscriptionId(stripeSubId);
+    if (!sub) return null;
+    const period = invoice.lines?.data[0]?.period;
+    return this.subscriptionRepo.recordPayment({
+      subscriptionId: sub.id,
+      stripeInvoiceId: invoice.id,
+      amount: failed ? invoice.amount_due : invoice.amount_paid,
+      currency: invoice.currency,
+      status: failed ? PaymentStatus.FAILED : PaymentStatus.COMPLETED,
+      failureReason: failed ? 'Payment failed' : undefined,
+      periodStart: new Date((period?.start ?? invoice.period_start) * 1000),
+      periodEnd: new Date((period?.end ?? invoice.period_end) * 1000),
+    });
+  }
+
+  async markPaid(
+    stripeSubscriptionId: string,
+    data: {
+      lastPaymentDate: Date;
+      currentPeriodStart: Date;
+      currentPeriodEnd: Date;
+    },
+  ) {
+    return this.subscriptionRepo.markPaid(stripeSubscriptionId, data);
+  }
+
+  async markPaymentFailed(stripeSubscriptionId: string, error: string) {
+    return this.subscriptionRepo.markPaymentFailed(stripeSubscriptionId, error);
+  }
+
+  async syncFromStripe(
+    stripeSubscriptionId: string,
+    data: {
+      status?: SubscriptionStatus;
+      cancelAtPeriodEnd: boolean;
+      currentPeriodStart: Date;
+      currentPeriodEnd: Date;
+    },
+  ) {
+    return this.subscriptionRepo.syncFromStripe(stripeSubscriptionId, data);
   }
 
   async createSubscriptionHistoryPayment(data: Stripe.Invoice) {
@@ -101,15 +149,27 @@ export class SubscriptionService {
     return this.subscriptionRepo.cancel(stripeSubscriptionId);
   }
 
-  // Helper — check what plan a user is on
   async getUserPlan(userId: string): Promise<SubscriptionPlan | null> {
     const subscription = await this.subscriptionRepo.findByUserId(userId);
     return subscription?.plan ?? null;
   }
 
-  // Helper — check if user has active subscription
   async isSubscriptionActive(userId: string): Promise<boolean> {
     const subscription = await this.subscriptionRepo.findByUserId(userId);
     return subscription?.status === SubscriptionStatus.ACTIVE;
+  }
+
+  async setCancelAtPeriodEnd(
+    stripeSubscriptionId: string,
+    cancelAtPeriodEnd: boolean,
+  ) {
+    return this.subscriptionRepo.setCancelAtPeriodEnd(
+      stripeSubscriptionId,
+      cancelAtPeriodEnd,
+    );
+  }
+
+  async getPayments(subscriptionId: string, take: number = 12) {
+    return this.subscriptionRepo.findPayments(subscriptionId, take);
   }
 }
