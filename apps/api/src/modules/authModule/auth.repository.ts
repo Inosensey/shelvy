@@ -60,6 +60,7 @@ export class AuthRepository {
             id: true,
           },
         },
+        subscriptionPlan: true,
         role: true,
         createdAt: true,
         updatedAt: true,
