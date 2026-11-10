@@ -36,7 +36,7 @@ import { SessionService } from './session.service';
 // DTOs
 import { RegisterDTO, LoginDTO } from './auth.dto';
 import { UserResponseDTO } from 'src/modules/usersModule/user.dto';
-import { SubscriptionPlan } from 'generated/prisma/enums';
+import { Role, SubscriptionPlan } from 'generated/prisma/enums';
 import type { AuthenticatedRequest } from 'src/types/request';
 
 @ApiTags('auth')
@@ -69,7 +69,7 @@ export class AuthController {
     if (user.plan && user.plan !== SubscriptionPlan.FREE) {
       user.plan = SubscriptionPlan.FREE;
     }
-    const result = await this.authService.createUser(user);
+    const result = await this.authService.createUser(user, Role.OWNER);
     return ApiResponseShaper.success(result, 'User created successfully');
   }
 
