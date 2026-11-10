@@ -11,6 +11,7 @@ import { Expose, Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateOrganizationDTO } from '../organizationModule/organization.dto';
 import { RegisterMemberDTO } from '../authModule/auth.dto';
+import { SubscriptionPlan } from 'generated/prisma/enums';
 
 // ============================================
 // CreateUserInfoDTO (what we receive from the client)
@@ -296,4 +297,7 @@ export class UserResponseDTO {
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
   updatedAt!: Date | null;
+
+  @ApiProperty({ enum: SubscriptionPlan, example: SubscriptionPlan.PREMIUM })
+  subscriptionPlan?: SubscriptionPlan;
 }
