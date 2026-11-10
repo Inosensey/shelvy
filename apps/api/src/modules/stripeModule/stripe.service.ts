@@ -1,23 +1,30 @@
 // src/stripe/stripe.service.ts
-import { Injectable, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  InternalServerErrorException,
+  ForbiddenException,
+  ConflictException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import Stripe, { Subscription } from 'stripe';
 import { ConfigService } from '@nestjs/config';
-import { createCheckoutDTO, verifyPaymentDTO } from './stripe.dto';
+import { PaidPlan, SignupCheckoutDTO, verifyPaymentDTO } from './stripe.dto';
 import { StripeRepository } from './stripe.repository';
 import { ApiResponse } from 'src/utils/responseShaper';
 import {
   AuthProvider,
-  Prisma,
   Role,
   SubscriptionPlan,
   SubscriptionStatus,
 } from 'generated/prisma/client';
-import { UserResponseDTO } from '../usersModule/user.dto';
 import { AuthService } from '../authModule/auth.service';
 import { SubscriptionService } from '../subscriptionModule/subscription.service';
 import { UserService } from '../usersModule/user.service';
-import { NewUserResponseDTO } from '../authModule/auth.dto';
+import { AuthenticatedRequest } from 'src/types/request';
+import { invoiceSubscriptionId, mapStripeStatus } from 'src/utils/stripe.util';
 
 @Injectable()
 export class StripeService {
@@ -29,60 +36,70 @@ export class StripeService {
     private readonly subscriptionService: SubscriptionService,
     private readonly user: UserService,
   ) {}
+  private readonly logger = new Logger(StripeService.name);
 
-  async createStripeCustomer(email: string): Promise<Stripe.Customer> {
-    return await this.stripeRepo.createCustomer(email);
+  priceFor(plan: PaidPlan): string {
+    const key =
+      plan === PaidPlan.PREMIUM
+        ? 'STRIPE_PREMIUM_PRICE_ID'
+        : 'STRIPE_ENTERPRISE_PRICE_ID';
+    const id = this.configService.get<string>(key);
+    if (!id) throw new InternalServerErrorException(`${key} is not configured`);
+    return id;
   }
-  async getOrCreateStripeCustomer(
-    email: string,
-    userId?: string,
-  ): Promise<string> {
-    if (userId) {
-      const stripeCustomerId = await this.user.getStripeCustomerId(userId);
 
-      if (stripeCustomerId) {
-        return stripeCustomerId;
-      }
+  assertOwner(req: AuthenticatedRequest) {
+    if (req.user.userType !== Role.OWNER) {
+      throw new ForbiddenException('Only the owner can manage billing.');
     }
-
-    const newStripeCustomer = await this.createStripeCustomer(email);
-
-    // Save to database
-    // await this.user.updateStripeCustomerId(userId, newStripeCustomer.id);
-
-    return newStripeCustomer.id;
   }
-  async createSubscriptionCheckoutSession(
-    data: createCheckoutDTO,
-    plan: string,
-    priceId: string,
-    userId: string,
-  ) {
-    const stripeCustomerId = await this.getOrCreateStripeCustomer(
-      data.email,
-      userId,
-    );
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const isLoggedIn = userId ? 'true' : 'false';
+  private checkoutUrls(isLoggedIn: boolean) {
+    const base = this.configService.get<string>('FRONTEND_URL');
+    return {
+      success_url: `${base}/subscription/success?subscription_id={CHECKOUT_SESSION_ID}&logged_in=${isLoggedIn}`,
+      cancel_url: `${base}/subscription/cancel`,
+    };
+  }
+
+  async createSignupCheckout(data: SignupCheckoutDTO, priceId: string) {
+    if (await this.authService.getUserByEmail(data.email)) {
+      throw new ConflictException(
+        'An account with this email already exists. Sign in and upgrade instead.',
+      );
+    }
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      customer: stripeCustomerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      customer_email: data.email,
       metadata: {
-        userId: userId ? userId : null,
         email: data.email,
-        password: hashedPassword,
-        plan: plan,
+        password: await bcrypt.hash(data.password, 10),
+        plan: data.plan,
       },
-      success_url: `${this.configService.get('FRONTEND_URL')}/subscription/success?subscription_id={CHECKOUT_SESSION_ID}&logged_in=${isLoggedIn}`,
-      cancel_url: `${this.configService.get('FRONTEND_URL')}/subscription/cancel`,
+      ...this.checkoutUrls(false),
     });
+    return { sessionId: session.id, url: session.url };
+  }
 
+  async createUpgradeCheckout(userId: string, plan: PaidPlan, priceId: string) {
+    const user = await this.authService.getUserById(userId);
+    if (!user) throw new NotFoundException('User not found.');
+    console.log(user);
+    if (user.subscriptionPlan !== SubscriptionPlan.FREE) {
+      throw new ConflictException(
+        'You already have a paid plan. Manage it from Billing.',
+      );
+    }
+    const customerId = await this.user.getStripeCustomerId(userId);
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      ...(customerId
+        ? { customer: customerId }
+        : { customer_email: user.email }),
+      metadata: { userId, plan }, // no email or password for upgrades
+      ...this.checkoutUrls(true),
+    });
     return { sessionId: session.id, url: session.url };
   }
 
@@ -233,38 +250,6 @@ export class StripeService {
     });
   }
 
-  async handleSubscriptionPaymentFailed(invoice: Stripe.Invoice) {
-    const subscriptionLine = invoice.lines?.data[0];
-    const subscriptionId = subscriptionLine?.subscription;
-
-    if (!subscriptionId || typeof subscriptionId !== 'string') {
-      console.log('No valid subscription found in invoice');
-      return;
-    }
-
-    const subscription =
-      await this.subscriptionService.getSubscriptionByStripeId(subscriptionId);
-
-    if (!subscription) return;
-
-    await this.subscriptionService.updateStatus(
-      subscriptionId,
-      SubscriptionStatus.PAST_DUE,
-    );
-    await this.subscriptionService.updatePaymentDatesAndFailedAttempts(
-      subscriptionId,
-      {
-        failedAttempts: (subscription.failedAttempts || 0) + 1,
-        lastPaymentError:
-          invoice.last_finalization_error?.message || 'Payment failed',
-      },
-    );
-
-    console.log(
-      `💳 Subscription ${subscription.id} payment failed: ${invoice.last_finalization_error?.message}`,
-    );
-  }
-
   async handleWebhook(rawBody: Buffer, signature: string) {
     if (!rawBody) {
       throw new Error('No raw body found');
@@ -280,6 +265,12 @@ export class StripeService {
         break;
       case 'invoice.paid':
         await this.handleInvoicePaid(event.data.object);
+        break;
+      case 'invoice.payment_failed':
+        await this.handleSubscriptionPaymentFailed(event.data.object);
+        break;
+      case 'customer.subscription.updated':
+        await this.handleSubscriptionUpdated(event.data.object);
         break;
       case 'customer.subscription.deleted':
         await this.handleSubscriptionDeleted(event.data.object);
@@ -320,112 +311,198 @@ export class StripeService {
   }
 
   async handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-    if (session.mode === 'subscription') {
-      const { email, plan, password, userId } = session.metadata as {
-        userId: string | null;
-        email: string;
-        password: string;
-        plan: string;
-      };
+    if (session.mode !== 'subscription') return;
 
-      const subscriptionPlan =
-        plan === 'premium'
-          ? SubscriptionPlan.PREMIUM
-          : SubscriptionPlan.ENTERPRISE;
+    const { email, plan, password, userId } = (session.metadata ?? {}) as {
+      userId?: string;
+      email?: string;
+      password?: string;
+      plan: string;
+    };
+    const subscriptionPlan =
+      plan === 'premium'
+        ? SubscriptionPlan.PREMIUM
+        : SubscriptionPlan.ENTERPRISE;
+    const stripeSubscriptionId = session.subscription as string; // sub_..., not session.id
+    const customerId = session.customer as string;
 
-      const stripeSubscription: Stripe.Subscription =
-        await this.stripe.subscriptions.retrieve(
-          session.subscription as string,
-        );
-      const firstItem = stripeSubscription.items.data[0];
-      let existingUser: UserResponseDTO | null = null;
-      const passwordAlreadyHashed = true;
+    const stripeSub =
+      await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const item = stripeSub.items.data[0];
 
-      if (userId) {
-        existingUser = await this.authService.getUserById(userId);
+    let ownerId: string;
+    if (userId) {
+      const existing = await this.authService.getUserById(userId);
+      if (!existing) {
+        this.logger.error(`Checkout ${session.id}: user ${userId} not found`);
+        return;
       }
-
+      ownerId = existing.id;
+      await this.authService.updateUserStripeCustomerId(ownerId, customerId);
+    } else {
+      const existingUser = await this.authService.getUserByEmail(email!); // add: findUnique select id
       if (existingUser) {
-        await this.authService.updateUserStripeCustomerId(
-          existingUser.id,
-          session.customer as string,
-        );
-
-        await this.stripeRepo.updateCustomerShelvyId(
-          session.customer as string,
-          existingUser.id,
-        );
-
-        await this.subscriptionService.createSubscription({
-          userId: existingUser.id,
-          plan: subscriptionPlan,
-          status: SubscriptionStatus.ACTIVE,
-          stripeSubscriptionId: session.id,
-          stripeCustomerId: session.customer as string,
-          stripePriceId: firstItem.price.id,
-          currentPeriodStart: new Date(firstItem.current_period_start * 1000),
-          currentPeriodEnd: new Date(firstItem.current_period_end * 1000),
-          nextPaymentDate: new Date(firstItem.current_period_end * 1000),
-        });
+        // Either a webhook retry that already got this far, or a real conflict
+        const already =
+          await this.subscriptionService.getSubscriptionByStripeId(
+            stripeSubscriptionId,
+          );
+        if (!already) {
+          this.logger.error(
+            `Paid signup for existing email ${email} (session ${session.id}): needs manual fix or refund`,
+          );
+          return; // no throw, so Stripe stops retrying
+        }
+        ownerId = existingUser.id;
       } else {
-        const userPayload: Prisma.UserCreateInput = {
-          email: email,
-          authProvider: AuthProvider.LOCAL,
-          subscriptionPlan: subscriptionPlan,
-          stripeCustomerId: session.customer as string,
-          password: password,
-          role: Role.OWNER,
-        };
-
-        const newUser: NewUserResponseDTO = await this.authService.createUser(
-          userPayload,
-          passwordAlreadyHashed,
+        const newUser = await this.authService.createUser(
+          {
+            email: email!,
+            authProvider: AuthProvider.LOCAL,
+            subscriptionPlan,
+            stripeCustomerId: customerId,
+            password: password!,
+          },
+          Role.OWNER,
+          true,
         );
-
-        await this.stripeRepo.updateCustomerShelvyId(
-          session.customer as string,
-          newUser.id,
-        );
-
-        await this.subscriptionService.createSubscription({
-          userId: newUser.id,
-          plan: subscriptionPlan,
-          status: SubscriptionStatus.ACTIVE,
-          stripeSubscriptionId: session.id,
-          stripeCustomerId: session.customer as string,
-          stripePriceId: firstItem.price.id,
-          currentPeriodStart: new Date(firstItem.current_period_start * 1000),
-          currentPeriodEnd: new Date(firstItem.current_period_end * 1000),
-          nextPaymentDate: new Date(firstItem.current_period_end * 1000),
-        });
+        ownerId = newUser.id;
       }
+    }
+
+    await this.stripeRepo.updateCustomerShelvyId(customerId, ownerId);
+    await this.subscriptionService.activateSubscription({
+      userId: ownerId,
+      plan: subscriptionPlan,
+      stripeSubscriptionId,
+      stripeCustomerId: customerId,
+      stripePriceId: item.price.id,
+      amount: (item.price.unit_amount ?? 0) / 100,
+      currentPeriodStart: new Date(item.current_period_start * 1000),
+      currentPeriodEnd: new Date(item.current_period_end * 1000),
+    });
+
+    // First invoice: invoice.paid may have arrived before the row existed
+    if (typeof session.invoice === 'string') {
+      const invoice = await this.stripe.invoices.retrieve(session.invoice);
+      await this.subscriptionService.recordInvoice(invoice);
     }
   }
 
   async handleInvoicePaid(invoice: Stripe.Invoice) {
-    const subscriptionId = invoice.parent?.subscription_details
-      ?.subscription as string;
+    const stripeSubId = invoiceSubscriptionId(invoice);
+    if (!stripeSubId) return;
+    const sub =
+      await this.subscriptionService.getSubscriptionByStripeId(stripeSubId);
+    if (!sub) return; // first invoice: the checkout handler records it
 
-    const subscription =
-      await this.subscriptionService.getSubscriptionByStripeId(subscriptionId);
-
-    if (subscription) {
-      await this.updateSubscriptionInfo(invoice);
-      await this.subscriptionService.createSubscriptionHistoryPayment(invoice);
-    }
+    const period = invoice.lines.data[0].period;
+    await this.subscriptionService.markPaid(stripeSubId, {
+      lastPaymentDate: new Date(
+        (invoice.status_transitions.paid_at ?? invoice.created) * 1000,
+      ),
+      currentPeriodStart: new Date(period.start * 1000),
+      currentPeriodEnd: new Date(period.end * 1000),
+    });
+    await this.subscriptionService.recordInvoice(invoice);
   }
 
-  async handleSubscriptionDeleted(Subscription: Stripe.Subscription) {
-    const subscription =
-      await this.subscriptionService.getSubscriptionByStripeId(Subscription.id);
+  async handleSubscriptionPaymentFailed(invoice: Stripe.Invoice) {
+    const stripeSubId = invoiceSubscriptionId(invoice);
+    if (!stripeSubId) return;
+    const sub =
+      await this.subscriptionService.getSubscriptionByStripeId(stripeSubId);
+    if (!sub) return;
 
-    if (!subscription) {
-      console.log('No subscription found in invoice');
-      return;
-    }
-
-    await this.subscriptionService.cancelSubscription(
-      subscription.stripeSubscriptionId!,
+    await this.subscriptionService.markPaymentFailed(
+      stripeSubId,
+      'Payment failed',
     );
+    await this.subscriptionService.recordInvoice(invoice, true);
+  }
+
+  async handleSubscriptionUpdated(stripeSub: Stripe.Subscription) {
+    const sub = await this.subscriptionService.getSubscriptionByStripeId(
+      stripeSub.id,
+    );
+    if (!sub) return;
+    const item = stripeSub.items.data[0];
+    await this.subscriptionService.syncFromStripe(stripeSub.id, {
+      status: mapStripeStatus(stripeSub.status) ?? undefined,
+      cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+      currentPeriodStart: new Date(item.current_period_start * 1000),
+      currentPeriodEnd: new Date(item.current_period_end * 1000),
+    });
+  }
+
+  async handleSubscriptionDeleted(stripeSub: Stripe.Subscription) {
+    const sub = await this.subscriptionService.getSubscriptionByStripeId(
+      stripeSub.id,
+    );
+    if (!sub) return;
+    await this.subscriptionService.cancelSubscription(stripeSub.id); // now downgrades the user too
+  }
+
+  async setCancelAtPeriodEnd(userId: string, cancel: boolean) {
+    const sub = await this.subscriptionService.getSubscriptionByUserId(userId);
+    if (
+      !sub?.stripeSubscriptionId ||
+      sub.status === SubscriptionStatus.CANCELED
+    ) {
+      throw new NotFoundException('No active subscription found.');
+    }
+    const updated = await this.stripe.subscriptions.update(
+      sub.stripeSubscriptionId,
+      {
+        cancel_at_period_end: cancel,
+      },
+    );
+    await this.subscriptionService.setCancelAtPeriodEnd(
+      sub.stripeSubscriptionId,
+      updated.cancel_at_period_end,
+    );
+    return {
+      cancelAtPeriodEnd: updated.cancel_at_period_end,
+      activeUntil: new Date(updated.items.data[0].current_period_end * 1000),
+    };
+  }
+
+  async getBilling(userId: string) {
+    const sub = await this.subscriptionService.getSubscriptionByUserId(userId);
+    if (!sub) {
+      return { plan: SubscriptionPlan.FREE, status: null, payments: [] };
+    }
+    const payments = await this.subscriptionService.getPayments(sub.id);
+    return {
+      plan: sub.plan,
+      status: sub.status,
+      amount: Number(sub.amount),
+      currentPeriodEnd: sub.currentPeriodEnd,
+      nextPaymentDate: sub.nextPaymentDate,
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      canceledAt: sub.canceledAt,
+      failedAttempts: sub.failedAttempts,
+      lastPaymentError: sub.lastPaymentError,
+      payments: payments.map((p) => ({
+        id: p.id,
+        amount: p.amount, // cents; the UI formats it
+        currency: p.currency,
+        status: p.status,
+        periodStart: p.periodStart,
+        periodEnd: p.periodEnd,
+        createdAt: p.createdAt,
+        failureReason: p.failureReason,
+      })),
+    };
+  }
+
+  async createBillingPortalSession(userId: string) {
+    const customerId = await this.user.getStripeCustomerId(userId);
+    if (!customerId) throw new NotFoundException('No billing account found.');
+    const session = await this.stripeRepo.createBillingPortalSession(
+      customerId,
+      `${this.configService.get('FRONTEND_URL')}/dashboard/settings?tab=billing`,
+    );
+    return { url: session.url };
   }
 }

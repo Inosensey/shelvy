@@ -113,7 +113,7 @@ const newMockSubscription = {
   userId: mockUser.id,
   plan: SubscriptionPlan.PREMIUM,
   status: SubscriptionStatus.ACTIVE,
-  stripeSubscriptionId: mockSession.id,
+  stripeSubscriptionId: mockSession.subscription,
   stripeCustomerId: mockSession.customer,
   stripePriceId: mockStripeSubscription.items.data[0].price.id,
   currentPeriodStart: expect.any(Date),

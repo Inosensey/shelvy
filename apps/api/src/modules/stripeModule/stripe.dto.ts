@@ -2,12 +2,18 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsString,
   IsStrongPassword,
   MaxLength,
   MinLength,
 } from 'class-validator';
+
+export enum PaidPlan {
+  PREMIUM = 'PREMIUM',
+  ENTERPRISE = 'ENTERPRISE',
+}
 
 export class createCheckoutDTO {
   @ApiProperty({
@@ -53,4 +59,13 @@ export class verifyPaymentDTO {
   @IsString({ message: 'Session ID must be a string' })
   @Transform(({ value }: { value: string }) => String(value.trim()))
   sessionId!: string;
+}
+export class SignupCheckoutDTO extends createCheckoutDTO {
+  @IsEnum(PaidPlan, { message: 'Plan must be premium or enterprise.' })
+  plan!: PaidPlan;
+}
+
+export class UpgradeCheckoutDTO {
+  @IsEnum(PaidPlan, { message: 'Plan must be premium or enterprise.' })
+  plan!: PaidPlan;
 }

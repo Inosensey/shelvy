@@ -7,15 +7,6 @@ import Stripe from 'stripe';
 export class StripeRepository {
   constructor(@Inject('STRIPE_CLIENT') private readonly stripe: Stripe) {}
 
-  async createCustomer(email: string): Promise<Stripe.Customer> {
-    return await this.stripe.customers.create({
-      email,
-      // metadata: {
-      //   shelvyUserId,
-      // },
-    });
-  }
-
   async updateCustomerShelvyId(
     customerId: string,
     shelvyUserId: string,
@@ -24,6 +15,16 @@ export class StripeRepository {
       metadata: {
         shelvyUserId,
       },
+    });
+  }
+
+  async createBillingPortalSession(
+    customerId: string,
+    returnUrl: string,
+  ): Promise<Stripe.BillingPortal.Session> {
+    return await this.stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
     });
   }
 }
