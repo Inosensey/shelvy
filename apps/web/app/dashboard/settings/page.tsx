@@ -6,6 +6,7 @@ import { SecurityPanel } from "@/components/dashboard/settings/SecurityPanel";
 import { OrganizationForm } from "@/components/dashboard/settings/OrganizationForm";
 import { nestJsEndpoints } from "@/lib/nestJsEndpoints";
 import { helpers } from "@/lib/helpers";
+import { BillingSection } from "@/components/dashboard/settings/BillingSection";
 
 interface Props {
   searchParams: Promise<{ tab?: string }>;
@@ -43,6 +44,8 @@ export default async function SettingsPage({ searchParams }: Props) {
           {res.message || "Could not load security settings."}
         </p>
       );
+  } else if (active === "billing") {
+    content = isOwner && <BillingSection />;
   } else {
     const res = await nestJsEndpoints.settingsApi.getOrganization();
     content =

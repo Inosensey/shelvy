@@ -15,6 +15,11 @@ const ok = (message: string): ApiResponse<null> => ({
 });
 const text = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim();
 
+const UPGRADE_PLANS: Record<string, paidPlans> = {
+  PREMIUM: "PREMIUM",
+  ENTERPRISE: "ENTERPRISE",
+};
+
 export async function saveProfile(
   _prev: ApiResponse<null>,
   formData: FormData,
@@ -104,4 +109,34 @@ export async function saveOrganization(
       e instanceof Error ? e.message : "Could not save the organization.",
     );
   }
+}
+
+export async function startUpgradeAction(
+  planId: string,
+): Promise<ApiResponse<{ url: string } | null>> {
+  const plan = UPGRADE_PLANS[planId];
+  if (!plan) return { success: false, message: "Invalid plan.", data: null };
+  return nestJsEndpoints.stripeApi.checkoutUpgrade({ plan });
+}
+
+export async function cancelSubscriptionAction(): Promise<
+  ApiResponse<unknown>
+> {
+  const res = await nestJsEndpoints.stripeApi.cancelSubscription();
+  if (res.success) revalidatePath("/dashboard/settings");
+  return res;
+}
+
+export async function resumeSubscriptionAction(): Promise<
+  ApiResponse<unknown>
+> {
+  const res = await nestJsEndpoints.stripeApi.resumeSubscription();
+  if (res.success) revalidatePath("/dashboard/settings");
+  return res;
+}
+
+export async function openBillingPortalAction(): Promise<
+  ApiResponse<{ url: string } | null>
+> {
+  return nestJsEndpoints.stripeApi.createPortalSession();
 }
