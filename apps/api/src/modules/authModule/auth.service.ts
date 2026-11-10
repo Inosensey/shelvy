@@ -13,7 +13,7 @@ import { LoginDTO, NewUserResponseDTO } from './auth.dto';
 // Types
 import { SessionService } from './session.service';
 import { UserResponseDTO } from '../usersModule/user.dto';
-import { Prisma } from 'generated/prisma/client';
+import { Prisma, Role } from 'generated/prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedRequest } from 'src/types/request';
 
@@ -36,11 +36,13 @@ export class AuthService {
 
   async createUser(
     data: Prisma.UserCreateInput,
+    role: Role,
     passwordAlreadyHashed: boolean = false,
   ): Promise<NewUserResponseDTO> {
     const hashedPassword = passwordAlreadyHashed
       ? data.password!
       : await bcrypt.hash(data.password!, 10);
+    data.role = role;
 
     const user = await this.authRepository.createUser(data, hashedPassword);
 
@@ -66,6 +68,10 @@ export class AuthService {
 
   async getUserById(id: string): Promise<UserResponseDTO | null> {
     return await this.authRepository.userFindById(id);
+  }
+
+  async getUserByEmail(email: string): Promise<UserResponseDTO | null> {
+    return await this.authRepository.userFindByEmail({ email } as LoginDTO);
   }
 
   async signIn(credentials: LoginDTO): Promise<{
