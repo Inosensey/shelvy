@@ -11,6 +11,7 @@ interface PaginatedResponse<T> {
   pageSize: number;
 }
 
+type paidPlans = "PREMIUM" | "ENTERPRISE" | undefined;
 type InviteStatus = "COMPLETED" | "EXPIRED" | "PENDING" | "REVOKED";
 type role = "OWNER" | "MANAGER" | "STAFF";
 
@@ -254,4 +255,28 @@ interface MyOrganization {
   id: string;
   name: string;
   description: string | null;
+}
+
+interface BillingPayment {
+  id: string;
+  amount: number; // cents
+  currency: string;
+  status: "COMPLETED" | "FAILED" | "REFUNDED" | "PENDING";
+  periodStart: string;
+  periodEnd: string;
+  createdAt: string;
+  failureReason: string | null;
+}
+
+interface BillingOverview {
+  plan: "FREE" | "PREMIUM" | "ENTERPRISE";
+  status: "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID" | "INCOMPLETE" | null;
+  amount?: number;
+  currentPeriodEnd?: string | null;
+  nextPaymentDate?: string | null;
+  cancelAtPeriodEnd?: boolean;
+  canceledAt?: string | null;
+  failedAttempts?: number;
+  lastPaymentError?: string | null;
+  payments: BillingPayment[];
 }

@@ -26,14 +26,16 @@ export default async function SubscriptionSuccessPage({
           <CheckCircle2 className="h-6 w-6" strokeWidth={2} />
         </div>
 
-        {subscription_id && (
+        {/* {subscription_id && (
           <p className="-mt-3 text-xs text-linen/35">
             Subscription ID: {subscription_id}
           </p>
-        )}
+        )} */}
 
         <RedirectCountdown
-          redirectTo="/login"
+          redirectTo={
+            logged_in === "true" ? "/dashboard/settings?tab=billing" : "/login"
+          }
           seconds={5}
           message="Redirecting to sign in"
         />

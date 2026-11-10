@@ -13,6 +13,7 @@ import { validateGroupInput, checkValidations } from "@/utils/validation";
 import type { formValidation } from "@/utils/validation.types";
 import type { PlanId } from "@/utils/plans";
 import { FormMessage } from "../reusable/FormMessage";
+import { STRIPE_TEST_MODE } from "@/utils/constants";
 
 interface RegisterFormProps {
   initialPlan?: PlanId;
@@ -56,7 +57,7 @@ export function RegisterForm({ initialPlan = "FREE" }: RegisterFormProps) {
       return;
     }
 
-    if (plan !== "FREE" && !hasConfirmedSandboxCard.current) {
+    if (plan !== "FREE" && STRIPE_TEST_MODE && !hasConfirmedSandboxCard.current) {
       e.preventDefault();
       setShowTestCardModal(true);
     }
@@ -142,7 +143,7 @@ export function RegisterForm({ initialPlan = "FREE" }: RegisterFormProps) {
         </AuthButton>
       </form>
 
-      {isPaidPlan && (
+      {isPaidPlan && STRIPE_TEST_MODE && (
         <TestCardModal
           open={showTestCardModal}
           onClose={() => setShowTestCardModal(false)}

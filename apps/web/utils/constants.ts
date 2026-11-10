@@ -5,6 +5,8 @@ export interface TestCard {
   date: string;
 }
 
+export const STRIPE_TEST_MODE = process.env.NEXT_PUBLIC_STRIPE_TEST_MODE === "true";
+
 export const TEST_CARDS: TestCard[] = [
   {
     brand: "Visa",

@@ -2,11 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  freeTierSignUp,
-  premiumTierSignUp,
-  enterpriseTierSignUp,
-} from "@/actions/authActions";
+import { freeTierSignUp, paidTierSignUp } from "@/actions/authActions";
 import type { PlanId } from "@/utils/plans";
 
 const freeInitialFormState: ApiResponse<null> = {
@@ -35,24 +31,20 @@ const paidInitialFormState: ApiResponse<null | {
 export function useRegisterResponseHandler(plan: PlanId) {
   const router = useRouter();
 
-  const [freeTierFormState, freeTierFormAction, isFreePending] =
-    useActionState(freeTierSignUp, freeInitialFormState);
-  const [premiumTierFormState, premiumTierFormAction, isPremiumPending] =
-    useActionState(premiumTierSignUp, paidInitialFormState);
-  const [
-    enterpriseTierFormState,
-    enterpriseTierFormAction,
-    isEnterprisePending,
-  ] = useActionState(enterpriseTierSignUp, paidInitialFormState);
+  const [freeTierFormState, freeTierFormAction, isFreePending] = useActionState(
+    freeTierSignUp,
+    freeInitialFormState,
+  );
+  const [paidTierFormState, paidTierFormAction, isPaidPending] = useActionState(
+    paidTierSignUp,
+    paidInitialFormState,
+  );
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
 
   function handleResult(
-    formState:
-      | typeof freeTierFormState
-      | typeof premiumTierFormState
-      | typeof enterpriseTierFormState,
+    formState: typeof freeTierFormState | typeof paidTierFormState,
     onSuccess: () => (() => void) | void,
   ) {
     if (!formState.message) return;
@@ -65,48 +57,26 @@ export function useRegisterResponseHandler(plan: PlanId) {
   }
 
   useEffect(() => {
-    switch (plan) {
-      case "FREE":
-        return handleResult(freeTierFormState, () => {
-          setSubmitMessage("Account created! Redirecting you to sign in…");
-          const timer = setTimeout(() => router.push("/login"), 1500);
-          return () => clearTimeout(timer);
-        });
-      case "PREMIUM":
-        return handleResult(premiumTierFormState, () => {
-          setSubmitMessage(premiumTierFormState.message);
-          const timer = setTimeout(
-            () => (window.location.href = premiumTierFormState.data!.url),
-            1500,
-          );
-          return () => clearTimeout(timer);
-        });
-      case "ENTERPRISE":
-        return handleResult(enterpriseTierFormState, () => {
-          setSubmitMessage(enterpriseTierFormState.message);
-          const timer = setTimeout(
-            () => (window.location.href = enterpriseTierFormState.data!.url),
-            1500,
-          );
-          return () => clearTimeout(timer);
-        });
+    if (plan === "FREE") {
+      return handleResult(freeTierFormState, () => {
+        setSubmitMessage("Account created! Redirecting you to sign in…");
+        const timer = setTimeout(() => router.push("/login"), 1500);
+        return () => clearTimeout(timer);
+      });
     }
+    return handleResult(paidTierFormState, () => {
+      setSubmitMessage(paidTierFormState.message);
+      const timer = setTimeout(
+        () => (window.location.href = paidTierFormState.data!.url),
+        1500,
+      );
+      return () => clearTimeout(timer);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freeTierFormState, premiumTierFormState, enterpriseTierFormState]);
+  }, [freeTierFormState, paidTierFormState]);
 
-  const formAction =
-    plan === "FREE"
-      ? freeTierFormAction
-      : plan === "PREMIUM"
-        ? premiumTierFormAction
-        : enterpriseTierFormAction;
-
-  const isPending =
-    plan === "FREE"
-      ? isFreePending
-      : plan === "PREMIUM"
-        ? isPremiumPending
-        : isEnterprisePending;
+  const formAction = plan === "FREE" ? freeTierFormAction : paidTierFormAction;
+  const isPending = plan === "FREE" ? isFreePending : isPaidPending;
 
   return { formAction, isPending, isSuccess, submitMessage };
 }

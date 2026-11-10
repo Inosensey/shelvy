@@ -157,6 +157,16 @@ class NestJsEndpoints {
         body: JSON.stringify(data),
       });
     },
+    checkoutSignup: async (data: {
+      email: string;
+      password: string;
+      plan: paidPlans;
+    }): Promise<ApiResponse<{ sessionId: string; url: string } | null>> => {
+      return this.request("/stripe/checkout/signup", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
     premiumTierSignUp: async (data: {
       email: string;
       password: string;
@@ -211,6 +221,37 @@ class NestJsEndpoints {
       const response: ApiResponse<{ ticket: string } | null> =
         await this.request("/auth/socket-ticket");
       return response;
+    },
+  };
+
+  // Stripe API
+  stripeApi = {
+    checkoutUpgrade: async (data: {
+      plan: paidPlans;
+    }): Promise<ApiResponse<{ sessionId: string; url: string } | null>> => {
+      await this.initFromCookies();
+      return this.request("/stripe/checkout/upgrade", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    getBilling: async (): Promise<ApiResponse<BillingOverview | null>> => {
+      await this.initFromCookies();
+      return this.request("/stripe/billing", { cache: "no-store" });
+    },
+    cancelSubscription: async (): Promise<ApiResponse<unknown>> => {
+      await this.initFromCookies();
+      return this.request("/stripe/subscription/cancel", { method: "POST" });
+    },
+    resumeSubscription: async (): Promise<ApiResponse<unknown>> => {
+      await this.initFromCookies();
+      return this.request("/stripe/subscription/resume", { method: "POST" });
+    },
+    createPortalSession: async (): Promise<
+      ApiResponse<{ url: string } | null>
+    > => {
+      await this.initFromCookies();
+      return this.request("/stripe/billing/portal", { method: "POST" });
     },
   };
 

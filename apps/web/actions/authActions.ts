@@ -6,32 +6,76 @@ import { redirect } from "next/navigation";
 import { nestJsEndpoints } from "@/lib/nestJsEndpoints";
 import { cookies } from "next/headers";
 
-// Stubs so the template runs end to end. Replace the bodies with your real
-// NestJS calls (POST /auth/register, POST /stripe/register, POST /auth/login).
+const PAID_PLAN_VALUES = {
+  PREMIUM: "PREMIUM",
+  ENTERPRISE: "ENTERPRISE",
+} as const;
 
-function toErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? `${fallback}: ${error.message}` : fallback;
+function readCredentials(formData: FormData) {
+  const email = (formData.get("email") as string) ?? "";
+  const password = (formData.get("password") as string) ?? "";
+
+  const results = validateGroupInput(
+    { email, password },
+    registerValidationRules,
+  );
+  if (!checkValidations(results)) {
+    const message = Object.values(results)
+      .filter((r) => r.valid === false)
+      .map((r) => r.validationMessage)
+      .join("\n");
+    return { ok: false as const, message };
+  }
+  return { ok: true as const, email, password };
 }
 
-// Stand-ins for your real endpoints.
-async function registerFreeUser(payload: { email: string; password: string }) {
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  // POST /auth/register -- creates the user directly, role: OWNER, plan: FREE
-  void payload;
-}
+export const paidTierSignUp = async (
+  prevState: ApiResponse<null>,
+  formData: FormData,
+): Promise<ApiResponse<{ sessionId: string; url: string } | null>> => {
+  const credentials = readCredentials(formData);
+  if (!credentials.ok) {
+    return { success: false, data: null, message: credentials.message };
+  }
 
-async function createStripeCheckoutSession(payload: {
-  email: string;
-  password: string;
-  plan: "PREMIUM" | "ENTERPRISE";
-}) {
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  // POST /stripe/register -- hashes password, creates a Stripe Customer,
-  // stashes { email, hashedPassword, plan } in the session metadata, and
-  // returns the checkout URL to redirect to.
-  void payload;
-  return "https://checkout.stripe.com/pay/stub-session";
-}
+  // Whitelist on our side too; never forward the raw form value
+  const planKey = formData.get("plan")?.toString() as
+    keyof typeof PAID_PLAN_VALUES | undefined;
+  const plan: paidPlans = planKey ? PAID_PLAN_VALUES[planKey] : undefined;
+  if (!plan) {
+    return {
+      success: false,
+      data: null,
+      message: "Please choose a paid plan.",
+    };
+  }
+
+  try {
+    const res = await nestJsEndpoints.authApi.checkoutSignup({
+      email: credentials.email,
+      password: credentials.password,
+      plan,
+    });
+    if (!res.success) return res;
+
+    return {
+      success: true,
+      data: res.data as { sessionId: string; url: string },
+      message:
+        "🔗 Checkout session created successfully! Connecting to Stripe...",
+    };
+  } catch (error) {
+    console.log(error);
+    return {
+      success: false,
+      data: null,
+      message:
+        error instanceof Error
+          ? `There is an error Signing up: ${error.message}`
+          : "An unknown error occurred",
+    };
+  }
+};
 
 export const freeTierSignUp = async (
   prevState: ApiResponse<null>,
@@ -79,129 +123,6 @@ export const freeTierSignUp = async (
       success: true,
       data: signUpResponse.data as User,
       message: "Account created! Redirecting you to sign in…",
-    };
-  } catch (error) {
-    console.log(error);
-    const errorMessage: string =
-      error instanceof Error
-        ? `There is an error Signing up: ${error.message}`
-        : "An unknown error occurred";
-    return {
-      success: false,
-      data: null,
-      message: errorMessage,
-    };
-  }
-};
-
-export const premiumTierSignUp = async (
-  prevState: ApiResponse<null>,
-  formData: FormData,
-): Promise<ApiResponse<{ sessionId: string; url: string } | null>> => {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
-  const values = {
-    email,
-    password,
-  };
-
-  const validationResults = validateGroupInput(values, registerValidationRules);
-  const isValid = checkValidations(validationResults);
-
-  if (!isValid) {
-    const message: string[] = [];
-    for (const [key, result] of Object.entries(validationResults)) {
-      if (result.valid === false) {
-        message.push(result.validationMessage);
-      }
-    }
-    return {
-      success: false,
-      data: null,
-      message: message.join("\n"),
-    };
-  }
-
-  const payload = {
-    email,
-    password,
-  };
-
-  try {
-    const signUpResponse =
-      await nestJsEndpoints.authApi.premiumTierSignUp(payload);
-
-    if (!signUpResponse.success) {
-      return signUpResponse;
-    }
-
-    return {
-      success: true,
-      data: signUpResponse.data as { sessionId: string; url: string },
-      message:
-        "🔗 Checkout session created successfully! Connecting to Stripe...",
-    };
-  } catch (error) {
-    console.log(error);
-    const errorMessage: string =
-      error instanceof Error
-        ? `There is an error Signing up: ${error.message}`
-        : "An unknown error occurred";
-    return {
-      success: false,
-      data: null,
-      message: errorMessage,
-    };
-  }
-};
-export const enterpriseTierSignUp = async (
-  prevState: ApiResponse<null>,
-  formData: FormData,
-): Promise<ApiResponse<{ sessionId: string; url: string } | null>> => {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
-  const values = {
-    email,
-    password,
-  };
-
-  const validationResults = validateGroupInput(values, registerValidationRules);
-  const isValid = checkValidations(validationResults);
-
-  if (!isValid) {
-    const message: string[] = [];
-    for (const [key, result] of Object.entries(validationResults)) {
-      if (result.valid === false) {
-        message.push(result.validationMessage);
-      }
-    }
-    return {
-      success: false,
-      data: null,
-      message: message.join("\n"),
-    };
-  }
-
-  const payload = {
-    email,
-    password,
-  };
-
-  try {
-    const signUpResponse =
-      await nestJsEndpoints.authApi.enterpriseTierSignUp(payload);
-
-    if (!signUpResponse.success) {
-      return signUpResponse;
-    }
-
-    return {
-      success: true,
-      data: signUpResponse.data as { sessionId: string; url: string },
-      message:
-        "🔗 Checkout session created successfully! Connecting to Stripe...",
     };
   } catch (error) {
     console.log(error);
@@ -293,7 +214,9 @@ export const signIn = async (
   }
 };
 
-export const signOut = async (redirectTo?: string): Promise<ApiResponse<null>> => {
+export const signOut = async (
+  redirectTo?: string,
+): Promise<ApiResponse<null>> => {
   const cookieStore = await cookies();
   try {
     const response = await nestJsEndpoints.authApi.signOut();
