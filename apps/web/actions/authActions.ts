@@ -4,7 +4,6 @@ import { checkValidations, validateGroupInput } from "@/utils/validation";
 import { registerValidationRules } from "../utils/validationRules";
 import { redirect } from "next/navigation";
 import { nestJsEndpoints } from "@/lib/nestJsEndpoints";
-import { cookies } from "next/headers";
 
 const PAID_PLAN_VALUES = {
   PREMIUM: "PREMIUM",
@@ -173,26 +172,6 @@ export const signIn = async (
   };
 
   try {
-    nestJsEndpoints.onResponse(async (headers) => {
-      const setCookieHeader = headers.get("set-cookie");
-      if (setCookieHeader) {
-        const cookieStore = await cookies();
-        const tokenMatch = setCookieHeader.match(/token=([^;]+)/);
-        if (tokenMatch) {
-          const token = tokenMatch[1];
-          console.log(token);
-          cookieStore.set("token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-            maxAge: 7 * 24 * 60 * 60,
-            path: "/",
-          });
-          nestJsEndpoints.setServerToken(token);
-        }
-      }
-    });
-
     const response = await nestJsEndpoints.authApi.signIn(payload);
 
     if (!response.success) {
@@ -217,7 +196,6 @@ export const signIn = async (
 export const signOut = async (
   redirectTo?: string,
 ): Promise<ApiResponse<null>> => {
-  const cookieStore = await cookies();
   try {
     const response = await nestJsEndpoints.authApi.signOut();
 
@@ -225,10 +203,7 @@ export const signOut = async (
       console.error("Backend sign out error:", response.message);
     }
 
-    cookieStore.delete("token");
-    cookieStore.delete("user_id");
-    cookieStore.delete("email");
-    nestJsEndpoints.setServerToken(null);
+    nestJsEndpoints.clearUserData();
 
     return {
       success: true,
@@ -238,7 +213,7 @@ export const signOut = async (
   } catch (error) {
     console.error("Sign out error:", error);
 
-    cookieStore.delete("token");
+    await nestJsEndpoints.clearUserData();
 
     const errorMessage: string =
       error instanceof Error

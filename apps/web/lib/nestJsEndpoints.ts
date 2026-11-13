@@ -1,86 +1,88 @@
-import { cookies } from "next/headers";
+import { cookies, headers as nextHeaders } from "next/headers";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+const isServer = () => typeof window === "undefined";
+
+const USER_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  maxAge: 7 * 24 * 60 * 60,
+  path: "/",
+} as const;
 
 class NestJsEndpoints {
-  private serverToken: string | null = null;
-  private user_id: string | null = null;
-  private email: string | null = null;
-  private responseInterceptor: ((headers: Headers) => Promise<void>) | null =
-    null;
-
-  setServerToken(token: string | null) {
-    this.serverToken = token;
+  private async readCookie(name: string): Promise<string | undefined> {
+    if (!isServer()) return undefined;
+    return (await cookies()).get(name)?.value;
   }
 
-  onResponse(callback: (headers: Headers) => Promise<void>) {
-    this.responseInterceptor = callback;
-  }
-
-  async initFromCookies() {
+  async setUserData(userId: string, email: string) {
     const cookieStore = await cookies();
-    this.setServerToken(cookieStore.get("token")?.value || null);
-    this.user_id = cookieStore.get("user_id")?.value || null;
-    this.email = cookieStore.get("email")?.value || null;
+    cookieStore.set("user_id", userId, USER_COOKIE_OPTIONS);
+    cookieStore.set("email", email, USER_COOKIE_OPTIONS);
   }
-  async clearUserData() {
-    this.user_id = null;
-    this.email = null;
-    this.serverToken = null;
 
+  async clearUserData() {
     const cookieStore = await cookies();
     cookieStore.delete("user_id");
     cookieStore.delete("email");
     cookieStore.delete("token");
   }
 
-  async setUserData(userId: string, email: string) {
-    this.user_id = userId;
-    this.email = email;
+  private async getHeaders(): Promise<Headers> {
+    const headers = new Headers({ "Content-Type": "application/json" });
 
-    const cookieStore = await cookies();
-    cookieStore.set("user_id", userId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
-      path: "/",
-    });
-    cookieStore.set("email", email, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
-      path: "/",
-    });
+    if (isServer()) {
+      const [cookieStore, reqHeaders] = await Promise.all([
+        cookies(),
+        nextHeaders(),
+      ]);
+
+      const token = cookieStore.get("token")?.value;
+      if (token) headers.set("Cookie", `token=${token}`);
+
+      const ip = reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+      // eslint-disable-next-line turbo/no-undeclared-env-vars
+      const key = process.env.INTERNAL_API_KEY;
+      if (ip && key) {
+        headers.set("x-client-ip", ip);
+        headers.set("x-internal-key", key);
+      }
+    }
+    return headers;
   }
 
-  private getHeaders(): HeadersInit {
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-    };
-
-    if (typeof window === "undefined" && this.serverToken) {
-      headers.Cookie = `token=${this.serverToken}`;
-    }
-
+  private async buildHeaders(extra?: HeadersInit): Promise<Headers> {
+    const headers = await this.getHeaders();
+    new Headers(extra).forEach((value, key) => headers.set(key, value));
     return headers;
+  }
+
+  private async persistSessionCookie(responseHeaders: Headers) {
+    const token = responseHeaders
+      .get("set-cookie")
+      ?.match(/token=([^;]+)/)?.[1];
+    if (!token) return;
+    (await cookies()).set("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60,
+      path: "/",
+    });
   }
 
   async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    interceptResponse: boolean = false,
+    persistSession: boolean = false,
   ): Promise<ApiResponse<T | null>> {
     try {
-      const isServer = typeof window === "undefined";
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
-        headers: {
-          ...this.getHeaders(),
-          ...options.headers,
-        },
-        ...(isServer ? {} : { credentials: "include" as RequestCredentials }),
+        headers: await this.buildHeaders(options.headers),
+        ...(isServer() ? {} : { credentials: "include" as RequestCredentials }),
         mode: "cors",
       });
 
@@ -93,9 +95,7 @@ class NestJsEndpoints {
         };
       }
 
-      if (interceptResponse && this.responseInterceptor) {
-        await this.responseInterceptor(response.headers);
-      }
+      if (persistSession) await this.persistSessionCookie(response.headers);
 
       return response.json();
     } catch (error) {
@@ -110,34 +110,28 @@ class NestJsEndpoints {
   async requestWithRawResponse(
     endpoint: string,
     options: RequestInit = {},
-    interceptResponse: boolean = false,
+    persistSession: boolean = false,
+    returnErrorResponse: boolean = false,
   ) {
     try {
-      const isServer = typeof window === "undefined";
-
-      const headers = new Headers(this.getHeaders());
-      new Headers(options.headers).forEach((value, key) =>
-        headers.set(key, value),
-      );
-
+      const headers = await this.buildHeaders(options.headers);
       if (options.body instanceof FormData) headers.delete("content-type");
 
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
         headers,
-        ...(isServer ? {} : { credentials: "include" as RequestCredentials }),
+        ...(isServer() ? {} : { credentials: "include" as RequestCredentials }),
         mode: "cors",
       });
 
       if (!response.ok) {
+        if (returnErrorResponse) return response; // let the caller read the error body
         const errorData = await response.json().catch(() => ({}));
         console.log(errorData.message || `HTTP ${response.status}`);
         return null;
       }
 
-      if (interceptResponse && this.responseInterceptor) {
-        await this.responseInterceptor(response.headers);
-      }
+      if (persistSession) await this.persistSessionCookie(response.headers);
 
       return response;
     } catch (error) {
@@ -217,7 +211,6 @@ class NestJsEndpoints {
     createSocketTicket: async (): Promise<
       ApiResponse<{ ticket: string } | null>
     > => {
-      await this.initFromCookies();
       const response: ApiResponse<{ ticket: string } | null> =
         await this.request("/auth/socket-ticket");
       return response;
@@ -229,28 +222,23 @@ class NestJsEndpoints {
     checkoutUpgrade: async (data: {
       plan: paidPlans;
     }): Promise<ApiResponse<{ sessionId: string; url: string } | null>> => {
-      await this.initFromCookies();
       return this.request("/stripe/checkout/upgrade", {
         method: "POST",
         body: JSON.stringify(data),
       });
     },
     getBilling: async (): Promise<ApiResponse<BillingOverview | null>> => {
-      await this.initFromCookies();
       return this.request("/stripe/billing", { cache: "no-store" });
     },
     cancelSubscription: async (): Promise<ApiResponse<unknown>> => {
-      await this.initFromCookies();
       return this.request("/stripe/subscription/cancel", { method: "POST" });
     },
     resumeSubscription: async (): Promise<ApiResponse<unknown>> => {
-      await this.initFromCookies();
       return this.request("/stripe/subscription/resume", { method: "POST" });
     },
     createPortalSession: async (): Promise<
       ApiResponse<{ url: string } | null>
     > => {
-      await this.initFromCookies();
       return this.request("/stripe/billing/portal", { method: "POST" });
     },
   };
@@ -258,21 +246,21 @@ class NestJsEndpoints {
   // User API
   userApi = {
     getMe: async (): Promise<ApiResponse<User | null>> => {
-      await this.initFromCookies();
+      const userId = (await this.readCookie("user_id")) ?? "anon";
       const response: ApiResponse<User | null> = await this.request(
         "/users/me/user",
         {
-          next: { tags: ["me", this.user_id!, `me-${this.user_id!}`] },
+          next: { tags: ["me", userId, `me-${userId}`] },
         },
       );
       return response;
     },
     getMeInfo: async (): Promise<ApiResponse<UserInformation | null>> => {
-      await this.initFromCookies();
+      const userId = (await this.readCookie("user_id")) ?? "anon";
       const response: ApiResponse<UserInformation | null> = await this.request(
         "/users/me/info",
         {
-          next: { tags: ["meInfo", this.user_id!, `meInfo-${this.user_id!}`] },
+          next: { tags: ["meInfo", userId, `meInfo-${userId}`] },
         },
       );
 
@@ -281,7 +269,6 @@ class NestJsEndpoints {
     saveUserInfo: async (
       data: UserInformation,
     ): Promise<ApiResponse<UserInformation | null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<UserInformation | null> = await this.request(
         "/users/me/info",
         {
@@ -294,7 +281,6 @@ class NestJsEndpoints {
     saveOnboardingInfo: async (
       data: OnboardingInfo,
     ): Promise<ApiResponse<OnboardingInfo | null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<OnboardingInfo | null> = await this.request(
         "/users/me/org/onboarding",
         {
@@ -309,7 +295,6 @@ class NestJsEndpoints {
       password: string;
       userInfo: UserInformation;
     }): Promise<ApiResponse<null | InviteValidationResult>> => {
-      await this.initFromCookies();
       const response: ApiResponse<null | InviteValidationResult> =
         await this.request("/users/me/member/onboarding", {
           method: "POST",
@@ -324,7 +309,6 @@ class NestJsEndpoints {
     sendInviteEmail: async (
       data: SendInviteEmailPayload,
     ): Promise<ApiResponse<null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<null> = await this.request(
         "/organizations/send-invite-email",
         {
@@ -337,7 +321,6 @@ class NestJsEndpoints {
     resendInviteEmail: async (
       token: string,
     ): Promise<ApiResponse<OrgInvite | null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<OrgInvite | null> = await this.request(
         `/organizations/invites/${token}/resend`,
         {
@@ -349,7 +332,6 @@ class NestJsEndpoints {
     revokeInvite: async (
       token: string,
     ): Promise<ApiResponse<OrgInvite | null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<OrgInvite | null> = await this.request(
         `/organizations/invites/${token}/revoke`,
         {
@@ -362,7 +344,6 @@ class NestJsEndpoints {
     removeMember: async (
       memberId: string,
     ): Promise<ApiResponse<string | null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<string | null> = await this.request(
         `/organizations/members/${memberId}`,
         {
@@ -372,7 +353,6 @@ class NestJsEndpoints {
       return response;
     },
     acceptInvite: async (token: string): Promise<ApiResponse<null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<null> = await this.request(
         `/organizations/invites/${token}/accept`,
         {
@@ -384,7 +364,6 @@ class NestJsEndpoints {
     validateInviteToken: async (
       token: string | undefined,
     ): Promise<ApiResponse<InviteValidationResult | null>> => {
-      await this.initFromCookies();
       if (!token) {
         return {
           success: false,
@@ -409,7 +388,6 @@ class NestJsEndpoints {
     getOrganizationMembers: async (): Promise<
       ApiResponse<OrgMember[] | null>
     > => {
-      await this.initFromCookies();
       const response: ApiResponse<OrgMember[] | null> = await this.request(
         `/organizations/my/members`,
         {
@@ -421,7 +399,6 @@ class NestJsEndpoints {
       return response;
     },
     getInviteRecords: async (): Promise<ApiResponse<OrgInvite[] | null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<OrgInvite[] | null> = await this.request(
         `/organizations/my/invites`,
         {
@@ -433,7 +410,6 @@ class NestJsEndpoints {
     getPendingInviteRecords: async (): Promise<
       ApiResponse<OrgInvite[] | null>
     > => {
-      await this.initFromCookies();
       const response: ApiResponse<OrgInvite[] | null> = await this.request(
         `/organizations/my/invites/pending`,
         {
@@ -446,7 +422,6 @@ class NestJsEndpoints {
     getRevokedInviteRecords: async (): Promise<
       ApiResponse<OrgInvite[] | null>
     > => {
-      await this.initFromCookies();
       const response: ApiResponse<OrgInvite[] | null> = await this.request(
         `/organizations/my/invites/revoked`,
         {
@@ -463,7 +438,6 @@ class NestJsEndpoints {
     getMyNotifications: async (): Promise<
       ApiResponse<NotificationWithMetadata[] | null>
     > => {
-      await this.initFromCookies();
       const response: ApiResponse<NotificationWithMetadata[] | null> =
         await this.request(`/notifications`, {
           next: { tags: ["myNotifications"] },
@@ -472,7 +446,6 @@ class NestJsEndpoints {
       return response;
     },
     markAllRead: async (): Promise<ApiResponse<null>> => {
-      await this.initFromCookies();
       const response: ApiResponse<null> = await this.request(
         "/notifications/read-all",
         {
@@ -489,7 +462,6 @@ class NestJsEndpoints {
       page?: number;
       pageSize?: number;
     }): Promise<ApiResponse<PaginatedResponse<Supplier> | null>> => {
-      await this.initFromCookies();
       const searchParams = new URLSearchParams();
       if (params.search) searchParams.set("search", params.search);
       if (params.page) searchParams.set("page", String(params.page));
@@ -502,13 +474,11 @@ class NestJsEndpoints {
     getSupplierOptions: async (): Promise<
       ApiResponse<SupplierOption[] | null>
     > => {
-      await this.initFromCookies();
       return this.request("/suppliers/options");
     },
     createSupplier: async (
       data: SupplierInput,
     ): Promise<ApiResponse<Supplier | null>> => {
-      await this.initFromCookies();
       return this.request("/suppliers", {
         method: "POST",
         body: JSON.stringify(data),
@@ -518,14 +488,12 @@ class NestJsEndpoints {
       id: string,
       data: SupplierInput,
     ): Promise<ApiResponse<Supplier | null>> => {
-      await this.initFromCookies();
       return this.request(`/suppliers/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       });
     },
     deleteSupplier: async (id: string): Promise<ApiResponse<string | null>> => {
-      await this.initFromCookies();
       return this.request(`/suppliers/${id}`, { method: "DELETE" });
     },
   };
@@ -540,7 +508,6 @@ class NestJsEndpoints {
       page?: number;
       pageSize?: number;
     }): Promise<ApiResponse<PaginatedResponse<Product> | null>> => {
-      await this.initFromCookies();
       const searchParams = new URLSearchParams();
       if (params.search) searchParams.set("search", params.search);
       if (params.supplierId) searchParams.set("supplierId", params.supplierId);
@@ -556,7 +523,6 @@ class NestJsEndpoints {
     getProduct: async (
       id: string,
     ): Promise<ApiResponse<ProductDetail | null>> => {
-      await this.initFromCookies();
       return this.request(`/products/${id}`, {
         next: { tags: ["product", `product-${id}`] },
       });
@@ -564,11 +530,9 @@ class NestJsEndpoints {
     getProductOptions: async (): Promise<
       ApiResponse<ProductOption[] | null>
     > => {
-      await this.initFromCookies();
       return this.request("/products/options");
     },
     suggestSku: async (name: string): Promise<ApiResponse<string | null>> => {
-      await this.initFromCookies();
       return this.request(
         `/products/sku/suggestion?name=${encodeURIComponent(name)}`,
       );
@@ -576,7 +540,6 @@ class NestJsEndpoints {
     createProduct: async (
       data: Record<string, unknown>,
     ): Promise<ApiResponse<Product | null>> => {
-      await this.initFromCookies();
       return this.request("/products", {
         method: "POST",
         body: JSON.stringify(data),
@@ -586,7 +549,6 @@ class NestJsEndpoints {
       id: string,
       data: Record<string, unknown>,
     ): Promise<ApiResponse<Product | null>> => {
-      await this.initFromCookies();
       return this.request(`/products/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -596,33 +558,29 @@ class NestJsEndpoints {
       id: string,
       archived: boolean,
     ): Promise<ApiResponse<string | null>> => {
-      await this.initFromCookies();
       return this.request(
         `/products/${id}/${archived ? "archive" : "unarchive"}`,
         { method: "PATCH" },
       );
     },
     export: async (path: string): Promise<Response | null> => {
-      await this.initFromCookies();
       const response = await this.requestWithRawResponse(path);
-      console.log("response:", response);
       return response;
     },
     postForm: async (
       path: string,
       formData: FormData,
-    ): Promise<Response | null> => {
-      await this.initFromCookies();
-      const headers = new Headers(this.getHeaders() as HeadersInit);
-      headers.delete("content-type");
-
-      return this.requestWithRawResponse(path, {
-        method: "POST",
-        headers,
-        body: formData,
-        cache: "no-store",
-      });
-    },
+    ): Promise<Response | null> =>
+      this.requestWithRawResponse(
+        path,
+        {
+          method: "POST",
+          body: formData,
+          cache: "no-store",
+        },
+        false,
+        true,
+      ),
   };
   stockMovementsApi = {
     getMovements: async (params: {
@@ -633,7 +591,6 @@ class NestJsEndpoints {
       page?: number;
       pageSize?: number;
     }): Promise<ApiResponse<PaginatedResponse<StockMovement> | null>> => {
-      await this.initFromCookies();
       const searchParams = new URLSearchParams();
       (["productId", "type", "from", "to"] as const).forEach(
         (k) => params[k] && searchParams.set(k, params[k]!),
@@ -648,7 +605,6 @@ class NestJsEndpoints {
     recordMovement: async (
       data: Record<string, unknown>,
     ): Promise<ApiResponse<StockMovement | null>> => {
-      await this.initFromCookies();
       return this.request("/stock-movements", {
         method: "POST",
         body: JSON.stringify(data),
@@ -658,11 +614,9 @@ class NestJsEndpoints {
       id: string,
       pageSize: number,
     ): Promise<ApiResponse<{ page: number } | null>> => {
-      await this.initFromCookies();
       return this.request(`/stock-movements/${id}/page?pageSize=${pageSize}`);
     },
     export: async (path: string): Promise<Response | null> => {
-      await this.initFromCookies();
       const response = await this.requestWithRawResponse(path);
       return response;
     },
@@ -673,7 +627,6 @@ class NestJsEndpoints {
       page?: number;
       pageSize?: number;
     }): Promise<ApiResponse<PaginatedResponse<MovementRequest> | null>> => {
-      await this.initFromCookies();
       const searchParams = new URLSearchParams();
       if (params.status) searchParams.set("status", params.status);
       if (params.page) searchParams.set("page", String(params.page));
@@ -689,7 +642,6 @@ class NestJsEndpoints {
     createRequest: async (
       data: Record<string, unknown>,
     ): Promise<ApiResponse<MovementRequest | null>> => {
-      await this.initFromCookies();
       return this.request("/stock-movement-requests", {
         method: "POST",
         body: JSON.stringify(data),
@@ -700,14 +652,12 @@ class NestJsEndpoints {
       decision: "approve" | "reject",
       decisionNote: string,
     ): Promise<ApiResponse<MovementRequest | null>> => {
-      await this.initFromCookies();
       return this.request(`/stock-movement-requests/${id}/${decision}`, {
         method: "PATCH",
         body: JSON.stringify({ decisionNote }),
       });
     },
     cancelRequest: async (id: string): Promise<ApiResponse<string | null>> => {
-      await this.initFromCookies();
       return this.request(`/stock-movement-requests/${id}`, {
         method: "DELETE",
       });
@@ -715,7 +665,6 @@ class NestJsEndpoints {
   };
   dashboardApi = {
     getOverview: async (): Promise<ApiResponse<DashboardOverview | null>> => {
-      await this.initFromCookies();
       return this.request("/dashboard/overview", {
         next: { tags: ["dashboardOverview"] },
       });
@@ -723,21 +672,17 @@ class NestJsEndpoints {
   };
   settingsApi = {
     getProfile: async (): Promise<ApiResponse<UserInfo | null>> => {
-      await this.initFromCookies();
       return this.request("/users/me/info");
     },
     getSecurity: async (): Promise<ApiResponse<SecurityInfo | null>> => {
-      await this.initFromCookies();
       return this.request("/users/me/security");
     },
     getOrganization: async (): Promise<ApiResponse<MyOrganization | null>> => {
-      await this.initFromCookies();
       return this.request("/organizations/me");
     },
     updateProfile: async (
       data: Record<string, unknown>,
     ): Promise<ApiResponse<UserInfo | null>> => {
-      await this.initFromCookies();
       return this.request("/users/me/info", {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -747,7 +692,6 @@ class NestJsEndpoints {
       currentPassword: string;
       newPassword: string;
     }): Promise<ApiResponse<null>> => {
-      await this.initFromCookies();
       return this.request("/users/me/password", {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -756,13 +700,11 @@ class NestJsEndpoints {
     revokeOtherSessions: async (): Promise<
       ApiResponse<{ count: number } | null>
     > => {
-      await this.initFromCookies();
       return this.request("/auth/sessions/revoke-others", { method: "POST" });
     },
     updateOrganization: async (
       data: Record<string, unknown>,
     ): Promise<ApiResponse<MyOrganization | null>> => {
-      await this.initFromCookies();
       return this.request("/organizations/me", {
         method: "PATCH",
         body: JSON.stringify(data),
