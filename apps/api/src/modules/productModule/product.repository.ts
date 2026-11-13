@@ -12,6 +12,7 @@ import {
   UpdateProductDTO,
 } from './product.dto';
 import { skuPrefix } from 'src/utils/sku.util';
+import { PlanService } from '../planModule/plan.service';
 
 const include = {
   supplier: { select: { id: true, name: true } },
@@ -19,7 +20,10 @@ const include = {
 
 @Injectable()
 export class ProductRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly planService: PlanService,
+  ) {}
 
   private rethrowUnique(e: unknown): never {
     if (
@@ -88,8 +92,6 @@ export class ProductRepository {
       select: { sku: true },
     });
 
-    console.log('suggestSku rows', rows);
-
     const pattern = new RegExp(`^${prefix}-(\\d+)$`);
     const max = rows.reduce((highest, row) => {
       const hit = row.sku ? pattern.exec(row.sku) : null;
@@ -104,12 +106,20 @@ export class ProductRepository {
     const initial = dto.initialStock ?? 0;
 
     try {
-      return this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
+        const productToBeAdded = 1;
+
+        await this.planService.lockOrganization(tx, organizationId);
+        await this.planService.assertCanAddProducts(
+          organizationId,
+          productToBeAdded,
+        );
+
         const product = await tx.product.create({
           data: {
             name: dto.name,
             description: dto.description ?? null,
-            sku: dto.sku ?? null,
+            sku: dto.sku ?? (await this.suggestSku(organizationId, dto.name)),
             price: dto.price,
             stock: initial,
             lowStockThreshold: dto.lowStockThreshold ?? 5,
@@ -157,6 +167,22 @@ export class ProductRepository {
   }
 
   async setArchived(id: string, organizationId: string, archived: boolean) {
+    if (!archived) {
+      await this.prisma.$transaction(async (tx) => {
+        const productToBeUnArchived = 1;
+        await this.planService.lockOrganization(tx, organizationId);
+        await this.planService.assertCanAddProducts(
+          organizationId,
+          productToBeUnArchived,
+        );
+        const { count } = await tx.product.updateMany({
+          where: { id, organizationId },
+          data: { archivedAt: null },
+        });
+        if (count === 0) throw new NotFoundException('Product not found.');
+      });
+      return;
+    }
     const { count } = await this.prisma.product.updateMany({
       where: { id, organizationId },
       data: { archivedAt: archived ? new Date() : null },

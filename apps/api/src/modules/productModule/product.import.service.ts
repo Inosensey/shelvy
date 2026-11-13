@@ -12,6 +12,7 @@ import { Prisma } from 'generated/prisma/client';
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
 import { skuPrefix } from 'src/utils/sku.util';
 import { CreateProductDTO } from './product.dto';
+import { PlanService } from '../planModule/plan.service';
 
 const MAX_ROWS = 1000;
 const ALLOWED = [
@@ -63,7 +64,10 @@ const blankToUndefined = (v: string) => (v === '' ? undefined : v);
 export class ProductImportService {
   private readonly logger = new Logger(ProductImportService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly planService: PlanService,
+  ) {}
   private diff(
     p: Parsed,
     match: {
@@ -414,6 +418,7 @@ export class ProductImportService {
     try {
       const result = await this.prisma.$transaction(
         async (tx) => {
+          await this.planService.lockOrganization(tx, organizationId);
           const parsed = await this.plan(tx, organizationId, records);
 
           const errors = parsed.filter((p) => p.action === 'error').length;
@@ -424,6 +429,14 @@ export class ProductImportService {
 
           const creates = parsed.filter((p) => p.action === 'create');
           const updates = parsed.filter((p) => p.action === 'update');
+
+          if (creates.length) {
+            const productsToBeAdded = creates.length;
+            await this.planService.assertCanAddProducts(
+              organizationId,
+              productsToBeAdded,
+            );
+          }
 
           if (creates.length) {
             const created = await tx.product.createManyAndReturn({

@@ -39,8 +39,12 @@ import { PlanModule } from './modules/planModule/plan.module';
     NodemailerModule,
     SocketGatewayModule,
     NotificationModule,
+    PlanModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
+  ],
 })
 export class AppModule {}

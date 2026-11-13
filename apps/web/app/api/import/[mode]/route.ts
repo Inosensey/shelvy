@@ -35,14 +35,11 @@ export async function POST(
   const form = new FormData();
   form.append("file", file, file.name);
 
-  console.log('url', `/products/misc/import/${mode}`);
-
   const upstream = await nestJsEndpoints.productApi.postForm(
     `/products/misc/import/${mode}`,
     form,
   );
-
-  if(!upstream) {
+  if (!upstream) {
     return NextResponse.json(
       { success: false, message: "Import failed. Please try again." },
       { status: 500 },
@@ -51,13 +48,23 @@ export async function POST(
 
   const body = await upstream.json().catch(() => null);
 
-  if (mode === "commit" && upstream.ok) {
-    revalidateProductCache();
+  if (!upstream.ok || body?.success === false) {
+    const message = Array.isArray(body?.message)
+      ? body.message.join(" ")
+      : body?.message;
+    return NextResponse.json(
+      {
+        success: false,
+        message: message || "Import failed. Please try again.",
+      },
+      { status: upstream.ok ? 400 : upstream.status },
+    );
+  }
+
+  if (mode === "commit") {
+    await revalidateProductCache();
     revalidatePath("/dashboard/products/[id]", "page");
   }
 
-  return NextResponse.json(
-    body ?? { success: false, message: "Import failed. Please try again." },
-    { status: upstream.status },
-  );
+  return NextResponse.json(body, { status: upstream.status });
 }

@@ -21,6 +21,7 @@ import { differenceInHours } from 'date-fns';
 import { AuthenticatedRequest } from 'src/types/request';
 import { NotificationService } from '../notificationModule/notification.service';
 import { Role } from 'generated/prisma/enums';
+import { PlanService } from '../planModule/plan.service';
 
 @Injectable()
 export class OrganizationService {
@@ -31,6 +32,7 @@ export class OrganizationService {
     private configService: ConfigService,
     private readonly nodemailerService: NodemailerService,
     private readonly notificationService: NotificationService,
+    private readonly planService: PlanService,
   ) {}
 
   assertOwnerOrg(req: AuthenticatedRequest) {
@@ -47,6 +49,9 @@ export class OrganizationService {
 
   async sendInviteEmail(data: SendInviteEmailDTO, ownerId: string) {
     const organization = await this.orgRepo.findByUserId(ownerId);
+
+    await this.planService.assertCanAddMember(organization!.id);
+
     const ownerInfo = await this.userService.getUserInfoById(ownerId);
     const ownerFullName = `${ownerInfo.firstName} (${ownerInfo.lastName})`;
     const token = this.nodemailerService.generateInviteToken();
@@ -83,6 +88,10 @@ export class OrganizationService {
 
     if (!inviteRecord) {
       throw new NotFoundException('Invite not found.');
+    }
+
+    if (inviteRecord.status !== 'PENDING') {
+      await this.planService.assertCanAddMember(organizationId);
     }
 
     const referenceTime = inviteRecord.lastResentAt ?? inviteRecord.createdAt;

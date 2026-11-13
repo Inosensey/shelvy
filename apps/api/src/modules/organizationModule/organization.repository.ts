@@ -17,6 +17,7 @@ import {
 import { InviteRole, NotificationType, Role } from 'generated/prisma/enums';
 import { NodemailerService } from 'src/NodemailerConfig/Nodemailer.service';
 import { UserService } from '../usersModule/user.service';
+import { PlanService } from '../planModule/plan.service';
 
 @Injectable()
 export class OrganizationRepository {
@@ -25,6 +26,7 @@ export class OrganizationRepository {
     private readonly nodemailerService: NodemailerService,
     @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
+    private readonly planService: PlanService,
   ) {}
 
   async create(data: CreateOrganizationDTO, userId: string) {
@@ -101,6 +103,9 @@ export class OrganizationRepository {
           'This account already belongs to an organization.',
         );
       }
+
+      await this.planService.lockOrganization(tx, invite.organizationId);
+      await this.planService.assertCanAcceptMember(invite.organizationId);
 
       const claimed = await tx.organizationInvite.updateMany({
         where: { id: invite.id, status: 'PENDING' },

@@ -23,6 +23,7 @@ import { CreateNotificationDTO } from '../notificationModule/notification.dto';
 import { NotificationType } from 'generated/prisma/enums';
 import { AuthenticatedRequest } from 'src/types/request';
 import { ChangePasswordDTO, UpdateProfileDTO } from './settings.dto';
+import { PlanService } from '../planModule/plan.service';
 
 @Injectable()
 export class UserService {
@@ -30,6 +31,7 @@ export class UserService {
     private readonly UserRepo: UserRepository,
     private readonly OrgService: OrganizationService,
     private readonly notificationService: NotificationService,
+    private readonly planService: PlanService,
   ) {}
 
   assertUser(id: string, req: AuthenticatedRequest) {
@@ -78,6 +80,9 @@ export class UserService {
     const inviteRecord = await this.OrgService.findInviteRecordByToken(
       data.token,
     );
+
+    await this.planService.assertCanAcceptMember(inviteRecord.organizationId);
+
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const credentials: RegisterMemberDTO = {
       email: inviteRecord.email,
