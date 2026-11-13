@@ -34,6 +34,7 @@ export class UserRepository {
             id: true,
           },
         },
+        subscriptionPlan: true,
         role: true,
         createdAt: true,
         updatedAt: true,
