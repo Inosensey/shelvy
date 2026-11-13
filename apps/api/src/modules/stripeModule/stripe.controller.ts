@@ -11,6 +11,10 @@ import { AuthGuard } from 'src/guards/auth.guard';
 import { PermissionsGuard } from 'src/guards/permission.guard';
 import type { AuthenticatedRequest } from 'src/types/request';
 import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  SkipThrottle,
+  Throttle,
+} from '@nestjs/throttler/dist/throttler.decorator';
 @Controller('stripe')
 export class StripeController {
   constructor(private readonly stripeService: StripeService) {}
@@ -46,6 +50,7 @@ export class StripeController {
     status: 400,
     description: 'Bad Request. Invalid signup data or invalid tier selected.',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('checkout/signup')
   async checkoutSignup(@Body() dto: SignupCheckoutDTO) {
     const session = await this.stripeService.createSignupCheckout(
@@ -94,6 +99,7 @@ export class StripeController {
     description: 'Forbidden. Access restricted to organization owners only.',
   })
   @UseGuards(AuthGuard, PermissionsGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('checkout/upgrade')
   async checkoutUpgrade(
     @Req() req: AuthenticatedRequest,
@@ -329,6 +335,7 @@ export class StripeController {
     description: 'Forbidden. Access restricted to organization owners only.',
   })
   @UseGuards(AuthGuard, PermissionsGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('billing/portal')
   async createBillingPortalSession(@Req() req: AuthenticatedRequest) {
     this.stripeService.assertOwner(req);
@@ -338,6 +345,7 @@ export class StripeController {
     return ApiResponseShaper.success(data, 'Portal session created');
   }
 
+  @SkipThrottle()
   @Post('webhook')
   async handleWebhook(@Req() request: Request) {
     const signature = request.headers['stripe-signature'] as string;

@@ -41,6 +41,7 @@ import { Role } from 'generated/prisma/enums';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ProductImportService } from './product.import.service';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Products')
 @ApiBearerAuth()
@@ -376,6 +377,7 @@ export class ProductController {
     status: 403,
     description: 'Forbidden access. Only owners and managers can export data.',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Get('misc/export')
   async export(@Req() req: AuthenticatedRequest, @Query() q: ProductQueryDTO) {
     if (req.user.userType === Role.STAFF) {
@@ -448,6 +450,7 @@ export class ProductController {
     status: 401,
     description: 'Unauthorized access token missing or expired.',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('misc/import/preview')
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 1_000_000, files: 1 } }),
@@ -511,6 +514,7 @@ export class ProductController {
     status: 401,
     description: 'Unauthorized access token missing or expired.',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('misc/import/commit')
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 1_000_000, files: 1 } }),

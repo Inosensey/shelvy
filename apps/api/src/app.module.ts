@@ -16,9 +16,14 @@ import { ProductModule } from './modules/productModule/product.module';
 import { StockMovementModule } from './modules/stockMovementModule/stockMovement.module';
 import { StockMovementRequestModule } from './modules/stockMovementRequestModule/stockMovementRequest.module';
 import { DashboardModule } from './modules/dashboardModule/dashboard.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ClientIpThrottlerGuard } from './guards/clientIpThrottler.guard';
+import { APP_GUARD } from '@nestjs/core/constants';
+import { PlanModule } from './modules/planModule/plan.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     DashboardModule,

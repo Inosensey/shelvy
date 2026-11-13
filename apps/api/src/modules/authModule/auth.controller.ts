@@ -38,6 +38,7 @@ import { RegisterDTO, LoginDTO } from './auth.dto';
 import { UserResponseDTO } from 'src/modules/usersModule/user.dto';
 import { Role, SubscriptionPlan } from 'generated/prisma/enums';
 import type { AuthenticatedRequest } from 'src/types/request';
+import { Throttle } from '@nestjs/throttler/dist/throttler.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -61,6 +62,7 @@ export class AuthController {
     status: 400,
     description: 'Bad request - Invalid input or email already exists',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
   async createUser(
     @Body()
@@ -88,6 +90,7 @@ export class AuthController {
   @Post('sign-in')
   @HttpCode(200)
   @UseInterceptors(CookieCheckInterceptor)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async signInUser(
     @Body()
     credentials: LoginDTO,

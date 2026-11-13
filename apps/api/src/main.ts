@@ -9,10 +9,14 @@ import { HttpExceptionFilter } from './HttpExceptionFilter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { useContainer } from 'class-validator';
 import { IncomingMessage } from 'http';
+import { NestExpressApplication } from '@nestjs/platform-express/interfaces/nest-express-application.interface';
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
+  app.set('trust proxy', 1);
   app.use(
     '/stripe/webhook',
     bodyParser.raw({

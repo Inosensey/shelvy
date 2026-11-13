@@ -36,6 +36,7 @@ import {
 import type { AuthenticatedRequest } from 'src/types/request';
 import { plainToInstance } from 'class-transformer';
 import { AllowWithoutOrganization } from 'src/decorators/allowWithoutOrg.decorator';
+import { Throttle } from '@nestjs/throttler/dist/throttler.decorator';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -131,6 +132,7 @@ export class OrganizationController {
     description: 'Forbidden access resource permissions error.',
   })
   @UseGuards(AuthGuard, PermissionsGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('send-invite-email')
   async sendInviteEmail(
     @Body() data: SendInviteEmailDTO,
@@ -160,6 +162,7 @@ export class OrganizationController {
     description: 'Invitation record not found.',
   })
   @UseGuards(AuthGuard, PermissionsGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Put('invites/:token/resend')
   async resendInviteEmail(
     @Param('token') token: string,
