@@ -208,7 +208,10 @@ export class StripeController {
   @Get('billing')
   async getBilling(@Req() req: AuthenticatedRequest) {
     this.stripeService.assertOwner(req);
-    const data = await this.stripeService.getBilling(req.user.userId);
+    const data = await this.stripeService.getBilling(
+      req.user.userId,
+      req.user.organizationId,
+    );
     return ApiResponseShaper.success(data, 'Billing retrieved successfully');
   }
 

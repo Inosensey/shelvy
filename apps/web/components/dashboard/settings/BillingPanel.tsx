@@ -11,6 +11,7 @@ import {
 import { STRIPE_TEST_MODE } from "@/utils/constants";
 import { TestCardModal } from "@/components/reusable/TestCardModal";
 import { Loader2 } from "lucide-react";
+import { UsageRow } from "./UsageRow";
 
 const dateFmt = new Intl.DateTimeFormat("en-PH", {
   dateStyle: "medium",
@@ -222,6 +223,22 @@ export function BillingPanel({ billing }: { billing: BillingOverview }) {
             </p>
           )}
         </section>
+        
+        {billing.usage && (
+          <section className="flex flex-col gap-4 rounded-xl border border-linen/15 p-5">
+            <h3 className="font-display text-lg">Usage</h3>
+            <UsageRow
+              label="Products"
+              used={billing.usage.products}
+              limit={billing.limits.products}
+            />
+            <UsageRow
+              label="Team members (incl. pending invites)"
+              used={billing.usage.members}
+              limit={billing.limits.members}
+            />
+          </section>
+        )}
 
         {/* Upgrade options */}
         {!hasActivePlan && (

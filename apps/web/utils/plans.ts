@@ -17,7 +17,7 @@ export const PLANS: Plan[] = [
     price: "₱0",
     period: "forever",
     description: "Get started with the basics.",
-    features: ["Up to 50 SKUs", "1 team member", "Basic stock reports"],
+    features: ["Up to 50 SKUs", "Up to 3 team members", "Basic stock reports"],
   },
   {
     id: "PREMIUM",

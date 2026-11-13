@@ -25,6 +25,8 @@ import { SubscriptionService } from '../subscriptionModule/subscription.service'
 import { UserService } from '../usersModule/user.service';
 import { AuthenticatedRequest } from 'src/types/request';
 import { invoiceSubscriptionId, mapStripeStatus } from 'src/utils/stripe.util';
+import { PlanService } from '../planModule/plan.service';
+import { PLAN_LIMITS } from '../planModule/plan.limits';
 
 @Injectable()
 export class StripeService {
@@ -35,6 +37,7 @@ export class StripeService {
     private readonly authService: AuthService,
     private readonly subscriptionService: SubscriptionService,
     private readonly user: UserService,
+    private readonly planService: PlanService,
   ) {}
   private readonly logger = new Logger(StripeService.name);
 
@@ -467,10 +470,26 @@ export class StripeService {
     };
   }
 
-  async getBilling(userId: string) {
+  async getBilling(userId: string, organizationId: string | null) {
+    const orgPlan = organizationId
+      ? await this.planService.getPlan(organizationId)
+      : SubscriptionPlan.FREE;
+    const usage = organizationId
+      ? await this.planService.getUsage(organizationId)
+      : null;
+    const extra = {
+      limits: PLAN_LIMITS[orgPlan],
+      usage: usage && { products: usage.products, members: usage.members },
+    };
+
     const sub = await this.subscriptionService.getSubscriptionByUserId(userId);
     if (!sub) {
-      return { plan: SubscriptionPlan.FREE, status: null, payments: [] };
+      return {
+        plan: SubscriptionPlan.FREE,
+        status: null,
+        payments: [],
+        ...extra,
+      };
     }
     const payments = await this.subscriptionService.getPayments(sub.id);
     return {
@@ -493,6 +512,7 @@ export class StripeService {
         createdAt: p.createdAt,
         failureReason: p.failureReason,
       })),
+      ...extra,
     };
   }
 

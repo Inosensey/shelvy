@@ -279,4 +279,6 @@ interface BillingOverview {
   failedAttempts?: number;
   lastPaymentError?: string | null;
   payments: BillingPayment[];
+  limits: { products: number | null; members: number | null };
+  usage: { products: number; members: number } | null;
 }
