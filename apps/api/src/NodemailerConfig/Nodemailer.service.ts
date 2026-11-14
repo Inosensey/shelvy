@@ -42,30 +42,36 @@ export class NodemailerService {
     inviteUrl: string;
     expiresInDays: number;
   }): Promise<void> {
-    try {
-      const { subject, html, text } = buildInviteEmail({
-        inviterName: inviteEmailPayload.inviterName,
-        organizationName: inviteEmailPayload.organizationName,
-        role: inviteEmailPayload.role,
-        inviteUrl: inviteEmailPayload.inviteUrl,
-        expiresInDays: inviteEmailPayload.expiresInDays,
-      });
+    const { subject, html, text } = buildInviteEmail({
+      inviterName: inviteEmailPayload.inviterName,
+      organizationName: inviteEmailPayload.organizationName,
+      role: inviteEmailPayload.role,
+      inviteUrl: inviteEmailPayload.inviteUrl,
+      expiresInDays: inviteEmailPayload.expiresInDays,
+    });
 
-      if (this.config.get<string>('MAIL_PROVIDER') === 'brevo') {
-        await this.sendViaBrevo(inviteEmailPayload.to, subject, html);
-      } else {
-        await this.mailerService.sendMail({
-          to: inviteEmailPayload.to,
-          subject: subject,
-          text: text,
-          html: html,
-        });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        `Failed to send invite email: ${message}`,
-      );
+    if (this.config.get<string>('MAIL_PROVIDER') === 'brevo') {
+      await this.sendViaBrevo(inviteEmailPayload.to, subject, html);
+    } else {
+      await this.mailerService.sendMail({
+        to: inviteEmailPayload.to,
+        subject: subject,
+        text: text,
+        html: html,
+      });
+    }
+  }
+
+  async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    text: string,
+  ): Promise<void> {
+    if (this.config.get<string>('MAIL_PROVIDER') === 'brevo') {
+      await this.sendViaBrevo(to, subject, html);
+    } else {
+      await this.mailerService.sendMail({ to, subject, html, text });
     }
   }
 

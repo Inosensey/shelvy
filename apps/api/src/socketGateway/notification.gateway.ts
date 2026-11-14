@@ -41,7 +41,6 @@ export class NotificationGateway
   async handleConnection(client: Socket<any, any, any, SocketData>) {
     try {
       const ticket = client.handshake.auth?.token as string | undefined;
-
       if (!ticket) {
         console.warn('Socket rejected: no ticket');
         client.emit('exception', {
@@ -62,30 +61,19 @@ export class NotificationGateway
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.userId },
-        select: { id: true, role: true, organizationId: true },
+        select: { id: true, organizationId: true },
       });
       if (!user) throw new Error('User not found');
 
-      const { id: userId, role, organizationId: orgId } = user;
-      client.data.userId = userId;
-      client.data.organizationId = orgId;
+      client.data.userId = user.id;
+      client.data.organizationId = user.organizationId;
 
-      if (orgId) {
-        await client.join(`org:${orgId}`);
-        console.log(`Client ${client.id} joined room -> org:${orgId}`);
-        await client.join(`org:${orgId}:${role.toLowerCase()}`);
-        await client.join(`org:${orgId}:${role.toLowerCase()}`);
-        await client.join(`org:${orgId}:${role.toLowerCase()}:${userId}`);
-        await client.join(`org:${orgId}:${role.toLowerCase()}:${userId}`);
-        console.log(
-          `Client ${client.id} joined room -> org:${orgId}:${role.toLowerCase()}`,
-        );
-      }
-      await client.join(`user:${userId}`);
+      await client.join(`user:${user.id}`);
+      if (user.organizationId) await client.join(`org:${user.organizationId}`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Invalid token context';
-      console.warn('Socket auth failed:', errorMessage); // new: shows up in Render logs
+      console.warn('Socket auth failed:', errorMessage);
       client.emit('exception', {
         success: false,
         message: `Connection unauthorized: ${errorMessage}`,
@@ -98,25 +86,7 @@ export class NotificationGateway
     console.log(`Client disconnected safely: ${client.id}`);
   }
 
-  emitToOrg(orgId: string, event: string, data: unknown) {
-    this.server.to(`org:${orgId}`).emit(event, data);
-  }
-
-  emitToOrgManagerOwner(
-    orgId: string,
-    userId: string,
-    event: string,
-    data: unknown,
-  ) {
-    this.server.to(`org:${orgId}:owner:${userId}`).emit(event, data);
-    this.server.to(`org:${orgId}:manager:${userId}`).emit(event, data);
-  }
-
   emitToUser(userId: string, event: string, data: unknown) {
     this.server.to(`user:${userId}`).emit(event, data);
-  }
-
-  testSocket(orgId: string, event: string, data: unknown) {
-    this.server.to(`org:${orgId}`).emit(event, data);
   }
 }

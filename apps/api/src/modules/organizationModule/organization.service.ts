@@ -142,7 +142,7 @@ export class OrganizationService {
   async acceptInvite(token: string, userId: string) {
     const notification = await this.orgRepo.acceptInvite(token, userId);
 
-    await this.notificationService.createAndEmit(notification);
+    await this.notificationService.notify([userId], notification);
 
     return true;
   }

@@ -10,22 +10,17 @@ export class NotifyRequesterHandler implements IEventHandler<StockMovementDecide
   constructor(private readonly notifications: NotificationService) {}
 
   async handle(e: StockMovementDecidedEvent) {
-    const emitTo = 'user';
     try {
-      await this.notifications.createAndEmit(
-        {
-          userId: e.requesterId,
-          type: NotificationType.MOVEMENT_DECIDED,
-          title: e.approved ? 'Request approved' : 'Request rejected',
-          message: `Your stock request for ${e.productName} was ${e.approved ? 'approved' : 'rejected'}.${e.decisionNote ? ` Note: ${e.decisionNote}` : ''}`,
-          organizationId: e.organizationId,
-          metadata: {
-            requestId: e.requestId,
-            status: e.approved ? 'APPROVED' : 'REJECTED',
-          },
+      await this.notifications.notify([e.requesterId], {
+        type: NotificationType.MOVEMENT_DECIDED,
+        title: e.approved ? 'Request approved' : 'Request rejected',
+        message: `Your stock request for ${e.productName} was ${e.approved ? 'approved' : 'rejected'}.${e.decisionNote ? ` Note: ${e.decisionNote}` : ''}`,
+        organizationId: e.organizationId,
+        metadata: {
+          requestId: e.requestId,
+          status: e.approved ? 'APPROVED' : 'REJECTED',
         },
-        emitTo,
-      );
+      });
     } catch (err) {
       this.logger.error(
         `Decision notification failed: ${err instanceof Error ? err.message : err}`,

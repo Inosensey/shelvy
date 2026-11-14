@@ -10,7 +10,10 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { NotificationType } from 'generated/prisma/client';
+import {
+  NotificationEmailMode,
+  NotificationType,
+} from 'generated/prisma/client';
 
 export class NotificationResponseDTO {
   @ApiProperty({ example: 'not_cmu29xace00004' })
@@ -111,4 +114,14 @@ export class CreateNotificationDTO {
   @IsOptional()
   @IsObject()
   metadata?: JsonValue | null;
+}
+export class UpdateNotificationSettingDTO {
+  @IsOptional()
+  @IsEnum(NotificationEmailMode)
+  emailMode?: NotificationEmailMode;
+
+  @IsOptional() @IsBoolean() emailLowStock?: boolean;
+  @IsOptional() @IsBoolean() emailRequests?: boolean;
+  @IsOptional() @IsBoolean() emailDecisions?: boolean;
+  @IsOptional() @IsBoolean() emailMembers?: boolean;
 }

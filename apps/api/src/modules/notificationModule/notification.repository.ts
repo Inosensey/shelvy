@@ -1,11 +1,36 @@
 // notification.repository.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
-import { NotificationType } from 'generated/prisma/client';
+import {
+  NotificationEmailMode,
+  NotificationType,
+  Role,
+} from 'generated/prisma/client';
+import { NotificationPayload } from 'src/types/notification';
+import { UpdateNotificationSettingDTO } from './notification.dto';
+
+const DEFAULT_SETTING = {
+  emailMode: NotificationEmailMode.IF_UNREAD,
+  emailLowStock: true,
+  emailRequests: true,
+  emailDecisions: true,
+  emailMembers: true,
+};
+const settingSelect = {
+  emailMode: true,
+  emailLowStock: true,
+  emailRequests: true,
+  emailDecisions: true,
+  emailMembers: true,
+} as const;
 
 @Injectable()
 export class NotificationRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async createMany(rows: (NotificationPayload & { userId: string })[]) {
+    return this.prisma.notification.createManyAndReturn({ data: rows });
+  }
 
   async create(data: {
     userId: string;
@@ -15,6 +40,22 @@ export class NotificationRepository {
     message: string;
   }) {
     return this.prisma.notification.create({ data });
+  }
+
+  async findManagerAndOwnerIds(organizationId: string) {
+    const users = await this.prisma.user.findMany({
+      where: { organizationId, role: { in: [Role.OWNER, Role.MANAGER] } },
+      select: { id: true },
+    });
+    return users.map((u) => u.id);
+  }
+
+  async findUserIdsByRoles(organizationId: string, roles: Role[]) {
+    const users = await this.prisma.user.findMany({
+      where: { organizationId, role: { in: roles } },
+      select: { id: true },
+    });
+    return users.map((u) => u.id);
   }
 
   async findAllByUserId(userId: string) {
@@ -37,10 +78,27 @@ export class NotificationRepository {
     });
   }
 
-  async markAllAsRead(organizationId: string) {
+  async markAllAsRead(userId: string) {
     return this.prisma.notification.updateMany({
-      where: { organizationId, isRead: false },
+      where: { isRead: false, userId },
       data: { isRead: true },
+    });
+  }
+
+  async getSetting(userId: string) {
+    const row = await this.prisma.notificationSetting.findUnique({
+      where: { userId },
+      select: settingSelect,
+    });
+    return row ?? DEFAULT_SETTING;
+  }
+
+  async upsertSetting(userId: string, data: UpdateNotificationSettingDTO) {
+    return this.prisma.notificationSetting.upsert({
+      where: { userId },
+      create: { userId, ...data },
+      update: data,
+      select: settingSelect,
     });
   }
 }

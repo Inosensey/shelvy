@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EventBus } from '@nestjs/cqrs';
 import { Role } from 'generated/prisma/enums';
-import { StockChangedEvent } from '../stockMovementModule/events/stockChange.event';
 import { toDelta } from 'src/utils/stockMovement';
 import {
   StockMovementDecidedEvent,
@@ -73,24 +72,13 @@ export class StockMovementRequestService {
     deciderId: string,
     dto: DecisionDTO,
   ) {
-    const { applied, request } = await this.stockMovementRequestRepo.approve(
+    const { request } = await this.stockMovementRequestRepo.approve(
       id,
       organizationId,
       deciderId,
       dto,
     );
 
-    this.eventBus.publish(
-      new StockChangedEvent(
-        organizationId,
-        applied.product.id,
-        applied.product.name,
-        applied.previousStock,
-        applied.product.stock,
-        applied.product.lowStockThreshold,
-        request.requestedById,
-      ),
-    );
     this.eventBus.publish(
       new StockMovementDecidedEvent(
         organizationId,
@@ -101,6 +89,17 @@ export class StockMovementRequestService {
         dto.decisionNote ?? null,
       ),
     );
+    // this.eventBus.publish(
+    //   new StockChangedEvent(
+    //     organizationId,
+    //     applied.product.id,
+    //     applied.product.name,
+    //     applied.previousStock,
+    //     applied.product.stock,
+    //     applied.product.lowStockThreshold,
+    //     request.requestedById,
+    //   ),
+    // );
     return request;
   }
 

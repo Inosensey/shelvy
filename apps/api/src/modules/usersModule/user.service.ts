@@ -19,8 +19,8 @@ import { RegisterMemberDTO } from '../authModule/auth.dto';
 import { OrganizationService } from '../organizationModule/organization.service';
 // import { NotificationGateway } from 'src/socketGateway/notification.gateway';
 import { NotificationService } from '../notificationModule/notification.service';
-import { CreateNotificationDTO } from '../notificationModule/notification.dto';
-import { NotificationType } from 'generated/prisma/enums';
+// import { CreateNotificationDTO } from '../notificationModule/notification.dto';
+import { NotificationType, Role } from 'generated/prisma/enums';
 import { AuthenticatedRequest } from 'src/types/request';
 import { ChangePasswordDTO, UpdateProfileDTO } from './settings.dto';
 import { PlanService } from '../planModule/plan.service';
@@ -99,18 +99,18 @@ export class UserService {
       inviteRecord.organizationId,
       inviteRecord.role,
     );
+    await this.OrgService.setInviteStatusToAccept(data.token);
 
-    const notificationPayload: CreateNotificationDTO = {
+    const recipientIds = await this.notificationService.recipientIds(
+      inviteRecord.organizationId,
+      [Role.OWNER, Role.MANAGER],
+    );
+    await this.notificationService.notify(recipientIds, {
       message: `${inviteRecord.email} has joined your organization!`,
       organizationId: inviteRecord.organizationId,
       title: 'New member joined',
       type: NotificationType.MEMBER_JOINED,
-      userId: inviteRecord.invitedById,
-    };
-
-    await this.OrgService.setInviteStatusToAccept(data.token);
-
-    await this.notificationService.createAndEmit(notificationPayload);
+    });
 
     return memberOnboardingResult;
   }

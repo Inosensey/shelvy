@@ -53,11 +53,7 @@ export class StockMovementService {
     const { movement, previousStock, product } =
       await this.stockMovementRepo.record(organizationId, userId, dto, delta);
 
-    (
-      this.eventBus as unknown as {
-        publish(event: StockChangedEvent): void;
-      }
-    ).publish(
+    this.eventBus.publish(
       new StockChangedEvent(
         organizationId,
         product.id,

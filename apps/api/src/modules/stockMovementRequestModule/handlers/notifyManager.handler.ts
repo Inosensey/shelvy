@@ -15,29 +15,34 @@ export class NotifyManagersHandler implements IEventHandler<StockMovementRequest
 
   async handle(e: StockMovementRequestedEvent) {
     try {
-      const emitTo = 'org manager and owner';
-      const recipients = await this.prisma.user.findMany({
-        where: {
-          organizationId: e.organizationId,
-          role: { in: [Role.OWNER, Role.MANAGER] },
+      const recipientIds = await this.notifications.recipientIds(
+        e.organizationId,
+        [Role.OWNER, Role.MANAGER],
+      );
+      await this.notifications.notify(recipientIds, {
+        type: NotificationType.MOVEMENT_REQUESTED,
+        title: 'Stock request',
+        message: `${e.requesterEmail} requested a stock change for ${e.productName}.`,
+        organizationId: e.organizationId,
+        metadata: {
+          requestId: e.requestId,
         },
-        select: { id: true },
       });
-      for (const recipient of recipients) {
-        await this.notifications.createAndEmit(
-          {
-            userId: recipient.id,
-            type: NotificationType.MOVEMENT_REQUESTED,
-            title: 'Stock request',
-            message: `${e.requesterEmail} requested a stock change for ${e.productName}.`,
-            organizationId: e.organizationId,
-            metadata: {
-              requestId: e.requestId,
-            },
-          },
-          emitTo,
-        );
-      }
+      // for (const recipient of recipients) {
+      //   await this.notifications.createAndEmit(
+      //     {
+      //       userId: recipient.id,
+      //       type: NotificationType.MOVEMENT_REQUESTED,
+      //       title: 'Stock request',
+      //       message: `${e.requesterEmail} requested a stock change for ${e.productName}.`,
+      //       organizationId: e.organizationId,
+      //       metadata: {
+      //         requestId: e.requestId,
+      //       },
+      //     },
+      //     emitTo,
+      //   );
+      // }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       this.logger.error(`Request notification failed: ${errorMessage}`);

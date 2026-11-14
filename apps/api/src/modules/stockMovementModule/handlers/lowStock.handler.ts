@@ -22,36 +22,39 @@ export class LowStockHandler implements IEventHandler<StockChangedEvent> {
     if (!wentOut && !crossedLow) return; // already low and still low: no spam
 
     try {
-      const emitTo = 'org manager and owner';
-      const recipients = await this.prisma.user.findMany({
-        where: {
-          organizationId: e.organizationId,
-          role: { in: [Role.OWNER, Role.MANAGER] },
-        },
-        select: { id: true },
-      });
-
       const message =
         e.newStock === 0
           ? `${e.productName} is out of stock.`
           : `${e.productName} is running low (${e.newStock} left).`;
 
-      for (const recipient of recipients) {
-        await this.notifications.createAndEmit(
-          {
-            userId: recipient.id,
-            type: NotificationType.LOW_STOCK,
-            title: e.newStock === 0 ? 'Out of stock' : 'Low stock',
-            message,
-            organizationId: e.organizationId,
-            metadata: {
-              productId: e.productId,
-              productName: e.productName,
-            },
-          },
-          emitTo,
-        );
-      }
+      const recipientIds = await this.notifications.recipientIds(
+        e.organizationId,
+        [Role.OWNER, Role.MANAGER],
+      );
+      await this.notifications.notify(recipientIds, {
+        type: NotificationType.LOW_STOCK,
+        title: e.newStock === 0 ? 'Out of stock' : 'Low stock',
+        message,
+        organizationId: e.organizationId,
+        metadata: { productId: e.productId, productName: e.productName },
+      });
+
+      // for (const recipient of recipients) {
+      //   await this.notifications.createAndEmit(
+      //     {
+      //       userId: recipient.id,
+      //       type: NotificationType.LOW_STOCK,
+      //       title: e.newStock === 0 ? 'Out of stock' : 'Low stock',
+      //       message,
+      //       organizationId: e.organizationId,
+      //       metadata: {
+      //         productId: e.productId,
+      //         productName: e.productName,
+      //       },
+      //     },
+      //     emitTo,
+      //   );
+      // }
     } catch (err) {
       this.logger.error(
         `Low-stock notification failed: ${err instanceof Error ? err.message : err}`,
