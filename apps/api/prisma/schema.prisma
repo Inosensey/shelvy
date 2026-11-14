@@ -75,6 +75,7 @@ model User {
 
   // Organization owned by this user
   ownedOrganization Organization? @relation("OrganizationOwner")
+  notificationSetting NotificationSetting? @relation("userNotificationSetting")
   requestedMovements StockMovementRequest[] @relation("RequestedMovements")
   decidedMovements StockMovementRequest[] @relation("DecidedMovements")
 
@@ -311,15 +312,36 @@ model Notification {
   isRead         Boolean          @default(false) @map("is_read")
   createdAt      DateTime         @default(now()) @map("created_at")
   metadata       Json?
+  emailedAt DateTime? @map("emailed_at")
+
 
   // Relationship lines (keep your original @relation definitions inside the parenthesis)
   organization   Organization     @relation(fields: [organizationId], references: [id])
   user           User             @relation(fields: [userId], references: [id])
 
+  @@index([userId, isRead])
+  @@index([isRead, emailedAt, createdAt])
   @@map("notifications")
+}
+model NotificationSetting {
+  userId         String                @id @map("user_id")
+  user           User                  @relation("userNotificationSetting",fields: [userId], references: [id], onDelete: Cascade)
+  emailMode      NotificationEmailMode @default(IF_UNREAD) @map("email_mode")
+  emailLowStock  Boolean               @default(true) @map("email_low_stock")
+  emailRequests  Boolean               @default(true) @map("email_requests")
+  emailDecisions Boolean               @default(true) @map("email_decisions")
+  emailMembers   Boolean               @default(true) @map("email_members")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  @@map("notification_settings")
 }
 
 // Enums
+enum NotificationEmailMode {
+  OFF
+  IF_UNREAD
+  IMMEDIATE
+}
 enum PaymentStatus {
   COMPLETED
   FAILED
