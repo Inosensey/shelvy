@@ -57,12 +57,10 @@ export function MovementsView({
           />
           <DateRangeFilter />
         </div>
-        {canManage && (
-          <div className="flex gap-2">
-            <ExportButton resource="stock-movements" />
-            {actionButton}
-          </div>
-        )}
+        <div className="flex gap-2">
+          {canManage && <ExportButton resource="stock-movements" />}
+          {actionButton}
+        </div>
       </div>
 
       {movements.length === 0 ? (
