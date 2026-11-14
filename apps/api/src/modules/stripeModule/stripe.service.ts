@@ -16,6 +16,7 @@ import { StripeRepository } from './stripe.repository';
 import { ApiResponse } from 'src/utils/responseShaper';
 import {
   AuthProvider,
+  NotificationType,
   Role,
   SubscriptionPlan,
   SubscriptionStatus,
@@ -27,6 +28,7 @@ import { AuthenticatedRequest } from 'src/types/request';
 import { invoiceSubscriptionId, mapStripeStatus } from 'src/utils/stripe.util';
 import { PlanService } from '../planModule/plan.service';
 import { PLAN_LIMITS } from '../planModule/plan.limits';
+import { NotificationService } from '../notificationModule/notification.service';
 
 @Injectable()
 export class StripeService {
@@ -38,6 +40,7 @@ export class StripeService {
     private readonly subscriptionService: SubscriptionService,
     private readonly user: UserService,
     private readonly planService: PlanService,
+    private readonly notificationService: NotificationService,
   ) {}
   private readonly logger = new Logger(StripeService.name);
 
@@ -417,11 +420,24 @@ export class StripeService {
       await this.subscriptionService.getSubscriptionByStripeId(stripeSubId);
     if (!sub) return;
 
+    const owner = await this.user.getUserById(sub.userId);
+
     await this.subscriptionService.markPaymentFailed(
       stripeSubId,
       'Payment failed',
     );
+
     await this.subscriptionService.recordInvoice(invoice, true);
+    if (owner.organizationId) {
+      await this.notificationService.notify([sub.userId], {
+        organizationId: owner.organizationId,
+        type: NotificationType.PAYMENT_FAILED,
+        title: 'Payment failed',
+        message:
+          "We couldn't process your latest subscription payment. Update your payment method to keep your plan.",
+        metadata: { invoiceId: invoice.id ?? null },
+      });
+    }
   }
 
   async handleSubscriptionUpdated(stripeSub: Stripe.Subscription) {

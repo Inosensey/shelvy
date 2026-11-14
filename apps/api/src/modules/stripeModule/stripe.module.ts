@@ -8,10 +8,17 @@ import { StripeRepository } from './stripe.repository';
 import { AuthModule } from '../authModule/auth.module';
 import { SubscriptionModule } from '../subscriptionModule/subscription.module';
 import { UserModule } from '../usersModule/user.module';
+import { NotificationModule } from '../notificationModule/notification.module';
 
 @Global()
 @Module({
-  imports: [ConfigModule, AuthModule, SubscriptionModule, UserModule],
+  imports: [
+    ConfigModule,
+    AuthModule,
+    SubscriptionModule,
+    UserModule,
+    NotificationModule,
+  ],
   controllers: [StripeController],
   providers: [
     StripeService,
