@@ -140,3 +140,18 @@ export async function openBillingPortalAction(): Promise<
 > {
   return nestJsEndpoints.stripeApi.createPortalSession();
 }
+
+export async function updateNotificationSettingsAction(
+  data: Partial<NotificationSettings>,
+) {
+  try {
+    const saved = await nestJsEndpoints.notificationsApi.updateSettings(data);
+    return { success: true as const, data: saved };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof Error ? error.message : "Failed to save settings",
+    };
+  }
+}

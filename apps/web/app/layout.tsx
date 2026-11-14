@@ -33,6 +33,8 @@ export default function RootLayout({
         <NextTopLoader color="#dcd7c9" showSpinner={true} />
         {children}
         <Toaster
+          expand
+          visibleToasts={5}
           position="bottom-right"
           theme="dark"
           toastOptions={{

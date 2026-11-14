@@ -51,6 +51,10 @@ const EVENTS: Partial<Record<NotificationType, EventConfig>> = {
       revalidateNotificationCache,
     ],
   },
+  PAYMENT_FAILED: {
+    toast: "warning",
+    revalidate: [revalidateNotificationCache],
+  },
 };
 
 export function dashboardListener(

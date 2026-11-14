@@ -455,6 +455,26 @@ class NestJsEndpoints {
 
       return response;
     },
+    getSettings: async () => {
+      const response = this.request<NotificationSettings>(
+        "/notifications/settings",
+        {
+          method: "GET",
+          cache: "no-store",
+        },
+      );
+      return response;
+    },
+    updateSettings: async (data: Partial<NotificationSettings>) => {
+      const response = this.request<NotificationSettings>(
+        "/notifications/settings",
+        {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        },
+      );
+      return response;
+    },
   };
   supplierApi = {
     getSuppliers: async (params: {

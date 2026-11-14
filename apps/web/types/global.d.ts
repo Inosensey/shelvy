@@ -133,7 +133,8 @@ type NotificationType =
   | "STOCK_MOVEMENT"
   | "PAYMENT_FAILED"
   | "MOVEMENT_REQUESTED"
-  | "MOVEMENT_DECIDED";
+  | "MOVEMENT_DECIDED"
+  | "PAYMENT_FAILED";
 
 interface Supplier {
   id: string;
@@ -281,4 +282,14 @@ interface BillingOverview {
   payments: BillingPayment[];
   limits: { products: number | null; members: number | null };
   usage: { products: number; members: number } | null;
+}
+
+type NotificationEmailMode = "OFF" | "IF_UNREAD" | "IMMEDIATE";
+
+interface NotificationSettings {
+  emailMode: NotificationEmailMode;
+  emailLowStock: boolean;
+  emailRequests: boolean;
+  emailDecisions: boolean;
+  emailMembers: boolean;
 }

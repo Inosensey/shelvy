@@ -7,6 +7,7 @@ import { OrganizationForm } from "@/components/dashboard/settings/OrganizationFo
 import { nestJsEndpoints } from "@/lib/nestJsEndpoints";
 import { helpers } from "@/lib/helpers";
 import { BillingSection } from "@/components/dashboard/settings/BillingSection";
+import NotificationsSection from "@/components/dashboard/settings/NotificationSection";
 
 interface Props {
   searchParams: Promise<{ tab?: string }>;
@@ -46,6 +47,8 @@ export default async function SettingsPage({ searchParams }: Props) {
       );
   } else if (active === "billing") {
     content = isOwner && <BillingSection />;
+  } else if (active === "notifications") {
+    content = <NotificationsSection role={role} />;
   } else {
     const res = await nestJsEndpoints.settingsApi.getOrganization();
     content =
