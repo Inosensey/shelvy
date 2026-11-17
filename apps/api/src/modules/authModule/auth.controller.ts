@@ -10,6 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -38,7 +39,6 @@ import { RegisterDTO, LoginDTO } from './auth.dto';
 import { UserResponseDTO } from 'src/modules/usersModule/user.dto';
 import { Role, SubscriptionPlan } from 'generated/prisma/enums';
 import type { AuthenticatedRequest } from 'src/types/request';
-import { Throttle } from '@nestjs/throttler/dist/throttler.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -119,6 +119,7 @@ export class AuthController {
     description:
       'Invalidates the user session and clears the authentication cookie.',
   })
+  @ApiCookieAuth('token')
   @ApiResponse({
     status: 200,
     description: 'Signed out successfully',
@@ -143,7 +144,7 @@ export class AuthController {
     response.clearCookie('token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: '/',
     });
     return ApiResponseShaper.success(null, 'Signed out successfully');
@@ -175,6 +176,38 @@ export class AuthController {
     return ApiResponseShaper.success(false, 'Session is invalid');
   }
 
+  @ApiOperation({
+    summary: 'Issue a short-lived WebSocket authentication ticket',
+    description:
+      'Generates a single-purpose JWT token valid for 60 seconds so the client can authenticate a WebSocket connection.',
+  })
+  @ApiCookieAuth('token')
+  @ApiResponse({
+    status: 200,
+    description: 'Socket ticket issued successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Socket ticket issued' },
+        data: {
+          type: 'object',
+          properties: {
+            ticket: {
+              type: 'string',
+              description: 'Short-lived JWT token (expires in 60 seconds).',
+              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            },
+          },
+          required: ['ticket'],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized access token missing or expired.',
+  })
   @UseGuards(AuthGuard)
   @Get('socket-ticket')
   getSocketTicket(@Req() req: AuthenticatedRequest) {
@@ -187,6 +220,7 @@ export class AuthController {
     description:
       'Terminates all active login sessions for the current user across other devices, except for the current session token.',
   })
+  @ApiCookieAuth('token')
   @ApiResponse({
     status: 200,
     description:

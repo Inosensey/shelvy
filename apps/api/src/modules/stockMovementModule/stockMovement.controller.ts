@@ -34,6 +34,7 @@ import { ApiResponse as ApiResponseShaper } from 'src/utils/responseShaper';
 import { Role } from 'generated/prisma/enums';
 import { manilaDate } from 'src/utils/csv.util';
 import { Readable } from 'node:stream';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Stock Movements')
 @ApiBearerAuth()
@@ -163,7 +164,7 @@ export class StockMovementController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description:
       'Target stock movement row ID not found within this company context.',
   })
@@ -173,10 +174,11 @@ export class StockMovementController {
     @Param('id') id: string,
     @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe) pageSize: number,
   ) {
+    const size = Math.min(Math.max(pageSize, 1), 100);
     const data = await this.service.getPageOf(
       req.user.organizationId!,
       id,
-      pageSize,
+      size,
     );
     return ApiResponseShaper.success(data, 'Page resolved');
   }
@@ -188,20 +190,8 @@ export class StockMovementController {
   })
   @ApiResponse({
     status: 200,
-    description:
-      'Stock movements export started successfully. Returns a CSV file stream embedded in the response wrapper.',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        message: { type: 'string', example: 'Stock movements export started' },
-        data: {
-          type: 'string',
-          format: 'binary',
-          description: 'The generated CSV file stream (text/csv).',
-        },
-      },
-    },
+    description: 'CSV file download.',
+    schema: { type: 'string', format: 'binary' },
   })
   @ApiResponse({
     status: 401,
@@ -211,6 +201,7 @@ export class StockMovementController {
     status: 403,
     description: 'Forbidden access. Only owners and managers can export data.',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Get('misc/export')
   async export(@Req() req: AuthenticatedRequest, @Query() q: MovementQueryDTO) {
     if (req.user.userType === Role.STAFF) {

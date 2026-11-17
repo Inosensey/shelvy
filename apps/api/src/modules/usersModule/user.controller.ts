@@ -32,6 +32,7 @@ import { UserService } from './user.service';
 // DTOs
 import {
   CreateUserInfoDTO,
+  SaveMemberOnboardingBodyDTO,
   SaveOrgOnboardingDTO,
   UserInfoResponseDTO,
   UserResponseDTO,
@@ -42,6 +43,7 @@ import { CreateOrganizationDTO } from '../organizationModule/organization.dto';
 import type { AuthenticatedRequest } from 'src/types/request';
 import { AllowWithoutOrganization } from 'src/decorators/allowWithoutOrg.decorator';
 import { ChangePasswordDTO, UpdateProfileDTO } from './settings.dto';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('users')
 @Controller('users')
@@ -237,19 +239,6 @@ export class UserController {
     description:
       'Saves the profile information for an invited member to complete their platform entry setup.',
   })
-  @ApiBearerAuth()
-  @ApiCookieAuth('token')
-  @ApiBody({
-    description:
-      'User profile information required to complete member onboarding.',
-    schema: {
-      type: 'object',
-      properties: {
-        userInfo: { $ref: getSchemaPath(CreateUserInfoDTO) },
-      },
-      required: ['userInfo'],
-    },
-  })
   @ApiResponse({
     status: 201,
     description: 'Member onboarding completed successfully',
@@ -262,14 +251,11 @@ export class UserController {
     status: 409,
     description: 'Conflict - Member profile has already been initialized',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('me/member/onboarding')
   async saveMemberOnboardingInfo(
     @Body()
-    data: {
-      token: string;
-      password: string;
-      userInfo: CreateUserInfoDTO;
-    },
+    data: SaveMemberOnboardingBodyDTO,
   ) {
     const result = await this.userService.saveMemberOnboardingInfo(data);
     return ApiResponseShaper.success(
@@ -281,8 +267,10 @@ export class UserController {
   @ApiOperation({
     summary: 'Get security info for the current user',
     description:
-      'Retrieves security-related configurations for the logged-in user, such as 2FA status, last password change date, and active sessions.',
+      'Retrieves security-related details for the logged-in user, including their authentication provider, password status, and active session count.',
   })
+  @ApiBearerAuth()
+  @ApiCookieAuth('token')
   @ApiResponse({
     status: 200,
     description: 'Security information retrieved successfully.',
@@ -297,13 +285,25 @@ export class UserController {
         data: {
           type: 'object',
           properties: {
-            twoFactorEnabled: { type: 'boolean', example: false },
-            passwordLastChanged: {
+            authProvider: {
               type: 'string',
-              format: 'date-time',
-              example: '2026-11-05T10:13:00.000Z',
+              enum: ['LOCAL', 'GOOGLE', 'GITHUB'],
+              example: 'LOCAL',
+            },
+            hasPassword: {
+              type: 'boolean',
+              description:
+                'Indicates whether the user has a local password set.',
+              example: true,
+            },
+            activeSessions: {
+              type: 'number',
+              description:
+                'Total count of currently valid, unexpired login sessions.',
+              example: 2,
             },
           },
+          required: ['authProvider', 'hasPassword', 'activeSessions'],
         },
       },
     },
@@ -311,6 +311,10 @@ export class UserController {
   @ApiResponse({
     status: 401,
     description: 'Unauthorized access token missing or expired.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found. User account could not be found.',
   })
   @UseGuards(AuthGuard, PermissionsGuard)
   @Get('me/security')
@@ -327,6 +331,8 @@ export class UserController {
     description:
       'Updates descriptive profile metadata for the authenticated user, such as name or contact details.',
   })
+  @ApiBearerAuth()
+  @ApiCookieAuth('token')
   @ApiBody({ type: UpdateProfileDTO })
   @ApiResponse({
     status: 200,
@@ -336,7 +342,7 @@ export class UserController {
       properties: {
         success: { type: 'boolean', example: true },
         message: { type: 'string', example: 'Profile updated successfully' },
-        data: { $ref: '#/components/schemas/UserResponseDTO' }, // Adjust if your service returns a different schema
+        data: { $ref: '#/components/schemas/UserResponseDTO' },
       },
     },
   })
@@ -363,6 +369,8 @@ export class UserController {
     description:
       'Modifies the user password after verifying their old credentials. Invalidates other active login sessions.',
   })
+  @ApiBearerAuth()
+  @ApiCookieAuth('token')
   @ApiBody({ type: ChangePasswordDTO })
   @ApiResponse({
     status: 200,
@@ -390,6 +398,7 @@ export class UserController {
   })
   @UseGuards(AuthGuard, PermissionsGuard)
   @Patch('me/password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async updatePassword(
     @Req() req: AuthenticatedRequest,
     @Body() dto: ChangePasswordDTO,

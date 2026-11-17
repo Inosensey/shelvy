@@ -12,6 +12,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -19,6 +20,7 @@ import {
   ApiBearerAuth,
   ApiCookieAuth,
   ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { PermissionsGuard } from 'src/guards/permission.guard';
@@ -36,7 +38,6 @@ import {
 import type { AuthenticatedRequest } from 'src/types/request';
 import { plainToInstance } from 'class-transformer';
 import { AllowWithoutOrganization } from 'src/decorators/allowWithoutOrg.decorator';
-import { Throttle } from '@nestjs/throttler/dist/throttler.decorator';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -76,7 +77,21 @@ export class OrganizationController {
   @ApiBearerAuth()
   @ApiCookieAuth('token')
   @ApiResponse({
+    status: 200,
     description: 'Invitation token revoked successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Invitation token revoked successfully.',
+        },
+        data: {
+          $ref: '#/components/schemas/OrgInviteResponseDto',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 401,
@@ -87,7 +102,7 @@ export class OrganizationController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444, // Or HttpStatus.NOT_FOUND if Prisma throws an exception when the token isn't found
+    status: 404,
     description: 'Invitation token not found.',
   })
   @UseGuards(AuthGuard, PermissionsGuard)
@@ -96,7 +111,7 @@ export class OrganizationController {
     @Param('token') token: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    this.orgService.assertOwnerOrg(req);
+    await this.orgService.assertOwnerOrg(req);
     const updatedInvite = await this.orgService.revokeInvite(
       token,
       req.user.organizationId!,
@@ -138,6 +153,7 @@ export class OrganizationController {
     @Body() data: SendInviteEmailDTO,
     @Req() req: AuthenticatedRequest,
   ) {
+    await this.orgService.assertOwnerOrg(req);
     await this.orgService.sendInviteEmail(data, req.user.userId);
     return ApiResponseShaper.success(null, 'Invite email sent successfully');
   }
@@ -146,7 +162,7 @@ export class OrganizationController {
   @ApiBearerAuth()
   @ApiCookieAuth('token')
   @ApiResponse({
-    status: 200, // 200 OK because we are modifying/updating an existing resource's communication state
+    status: 200,
     description: 'Invite email resent successfully',
   })
   @ApiResponse({
@@ -168,7 +184,7 @@ export class OrganizationController {
     @Param('token') token: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    this.orgService.assertOwnerOrg(req);
+    await this.orgService.assertOwnerOrg(req);
     const updatedInviteRecord = await this.orgService.resendInvite(
       token,
       req.user.organizationId!,
@@ -182,9 +198,10 @@ export class OrganizationController {
   @ApiOperation({ summary: 'Validate a pending invitation token' })
   @ApiResponse({
     status: 200,
-    type: ValidateInviteResponseDTO, // Emits your new class type mapping here
+    type: ValidateInviteResponseDTO,
     description: 'Invitation token verified successfully.',
   })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Get('invite/validate')
   async validateToken(@Query('token') token: string) {
     const metadata = await this.orgService.validateInviteToken(token);
@@ -218,7 +235,7 @@ export class OrganizationController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @Get('my/members')
   async getMembers(@Req() req: AuthenticatedRequest) {
-    this.orgService.assertOwnerOrg(req);
+    await this.orgService.assertOwnerOrg(req);
 
     const members = await this.orgService.getOrgMembersByOrganizationId(
       req.user.organizationId!,
@@ -252,7 +269,7 @@ export class OrganizationController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @Get('my/invites')
   async getInvites(@Req() req: AuthenticatedRequest) {
-    this.orgService.assertOwnerOrg(req);
+    await this.orgService.assertOwnerOrg(req);
 
     const invites = await this.orgService.getInviteRecordsByOrganizationId(
       req.user.organizationId!,
@@ -289,7 +306,7 @@ export class OrganizationController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @Get('my/invites/pending')
   async getPendingInvites(@Req() req: AuthenticatedRequest) {
-    this.orgService.assertOwnerOrg(req);
+    await this.orgService.assertOwnerOrg(req);
     const invites =
       await this.orgService.getPendingInviteRecordsByOrganizationId(
         req.user.organizationId!,
@@ -327,7 +344,7 @@ export class OrganizationController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @Get('my/invites/revoked')
   async getRevokedInvites(@Req() req: AuthenticatedRequest) {
-    this.orgService.assertOwnerOrg(req);
+    await this.orgService.assertOwnerOrg(req);
     const invites =
       await this.orgService.getRevokedInviteRecordsByOrganizationId(
         req.user.organizationId!,
@@ -370,7 +387,7 @@ export class OrganizationController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description: 'Member record not found within this organization context.',
   })
   @UseGuards(AuthGuard, PermissionsGuard)
@@ -379,7 +396,7 @@ export class OrganizationController {
     @Param('memberId') memberId: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    this.orgService.assertOwnerOrg(req);
+    await this.orgService.assertOwnerOrg(req);
     const removedId = await this.orgService.removeOrgMember(
       memberId,
       req.user.organizationId!,
@@ -392,6 +409,56 @@ export class OrganizationController {
     );
   }
 
+  @ApiOperation({
+    summary: 'Accept an organization invitation',
+    description:
+      'Validates an invitation token, links the authenticated user to the organization with the assigned role, and notifies the organization owner.',
+  })
+  @ApiParam({
+    name: 'token',
+    description: 'The unique invitation token sent to the user.',
+    type: 'string',
+    example: 'inv_9f8e7d6c5b4a3210...',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Invitation accepted and user added to the organization.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'You have joined the organization.',
+        },
+        data: { type: 'object', nullable: true, example: null },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description:
+      'Unauthorized. Access token is missing, expired, or user account not found.',
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden. The invitation was sent to a different email address, or the organization has reached its plan member limit.',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'Not Found. The invitation token is invalid or has already been used.',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Conflict. The user already belongs to an organization, or the invitation was just claimed.',
+  })
+  @ApiResponse({
+    status: 410,
+    description: 'Gone. The invitation link has expired.',
+  })
   @AllowWithoutOrganization()
   @UseGuards(AuthGuard, PermissionsGuard)
   @Post('invites/:token/accept')
@@ -420,7 +487,7 @@ export class OrganizationController {
           type: 'string',
           example: 'Organization updated successfully',
         },
-        data: { $ref: '#/components/schemas/OrganizationResponseDTO' }, // Adjust if your service returns a different schema name
+        data: { $ref: '#/components/schemas/OrganizationResponseDTO' },
       },
     },
   })

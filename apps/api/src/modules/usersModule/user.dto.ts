@@ -6,6 +6,8 @@ import {
   MaxLength,
   ValidateNested,
   IsDate,
+  MinLength,
+  IsStrongPassword,
 } from 'class-validator';
 import { Expose, Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -300,4 +302,30 @@ export class UserResponseDTO {
 
   @ApiProperty({ enum: SubscriptionPlan, example: SubscriptionPlan.PREMIUM })
   subscriptionPlan?: SubscriptionPlan;
+}
+
+export class SaveMemberOnboardingBodyDTO {
+  @ApiProperty() @IsString() @IsNotEmpty() token!: string;
+
+  @ApiProperty({ example: 'StrongP@ssw0rd' })
+  @IsString()
+  @IsNotEmpty({ message: 'Password is required.' })
+  @MinLength(8, { message: 'Password must be at least 8 characters long.' })
+  @MaxLength(20, { message: 'Password cannot exceed 20 characters.' })
+  @IsStrongPassword(
+    {
+      minLength: 8,
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 1,
+    },
+    { message: 'Password is too weak.' },
+  )
+  password!: string;
+
+  @ApiProperty({ type: CreateUserInfoDTO })
+  @ValidateNested()
+  @Type(() => CreateUserInfoDTO)
+  userInfo!: CreateUserInfoDTO;
 }

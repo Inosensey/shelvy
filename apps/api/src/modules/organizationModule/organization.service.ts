@@ -35,11 +35,21 @@ export class OrganizationService {
     private readonly planService: PlanService,
   ) {}
 
-  assertOwnerOrg(req: AuthenticatedRequest) {
+  async assertOwnerOrg(req: AuthenticatedRequest) {
     if (!req.user.organizationId) {
       throw new ForbiddenException(
         'Forbidden access resource permissions error',
       );
+    } else {
+      const organization = await this.orgRepo.findById(req.user.organizationId);
+      if (
+        req.user.userId !== organization.ownerId &&
+        req.user.userType !== Role.OWNER
+      ) {
+        throw new ForbiddenException(
+          'Forbidden access resource permissions error',
+        );
+      }
     }
   }
 

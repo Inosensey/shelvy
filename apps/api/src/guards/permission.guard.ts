@@ -5,6 +5,7 @@ import {
   Injectable,
   ForbiddenException,
 } from '@nestjs/common';
+import { PATH_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ALLOW_NO_ORG } from 'src/decorators/allowWithoutOrg.decorator';
@@ -51,7 +52,7 @@ export class PermissionsGuard implements CanActivate {
       MANAGER: ['READ', 'UPDATE'],
       STAFF: ['READ', 'UPDATE'],
     },
-    'stock-movement': {
+    'stock-movements': {
       OWNER: ['CREATE', 'READ'],
       MANAGER: ['CREATE', 'READ'],
       STAFF: ['READ'],
@@ -69,8 +70,8 @@ export class PermissionsGuard implements CanActivate {
     // Default/fallback permissions
     default: {
       OWNER: ['ALL'],
-      MANAGER: ['READ'],
-      STAFF: ['READ'],
+      MANAGER: [],
+      STAFF: [],
     },
   };
 
@@ -98,7 +99,7 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const resource = this.getResourceFromUrl(request.url);
+    const resource = this.getResource(context);
 
     const action = this.mapMethodToAction(method);
 
@@ -119,16 +120,11 @@ export class PermissionsGuard implements CanActivate {
     return true;
   }
 
-  private getResourceFromUrl(url: string): string {
-    const path = url.split('?')[0];
-    const parts = path.split('/').filter(Boolean);
-
-    // Handle /api prefix
-    if (parts[0] === 'api') {
-      return parts[1] || 'default';
-    }
-
-    return parts[0] || 'default';
+  private getResource(context: ExecutionContext): string {
+    const path = Reflect.getMetadata(PATH_METADATA, context.getClass()) as
+      string | string[] | undefined;
+    const first = Array.isArray(path) ? path[0] : path;
+    return (first ?? '').replace(/^\/+|\/+$/g, '').toLowerCase() || 'default';
   }
 
   private mapMethodToAction(method: HttpMethod): PermissionName {

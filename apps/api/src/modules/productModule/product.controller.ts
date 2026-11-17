@@ -10,7 +10,9 @@ import {
   Query,
   Req,
   StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -18,6 +20,7 @@ import {
   ApiConsumes,
   ApiCookieAuth,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -39,7 +42,6 @@ import { Readable } from 'node:stream';
 import { manilaDate } from 'src/utils/csv.util';
 import { Role } from 'generated/prisma/enums';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ProductImportService } from './product.import.service';
 import { Throttle } from '@nestjs/throttler';
 
@@ -68,8 +70,30 @@ export class ProductController {
         success: { type: 'boolean', example: true },
         message: { type: 'string', example: 'Products retrieve successfully' },
         data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/ProductResponseDTO' },
+          type: 'object',
+          properties: {
+            items: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ProductResponseDTO' },
+            },
+            total: {
+              type: 'number',
+              description:
+                'Total count of products matching the query filters.',
+              example: 125,
+            },
+            page: {
+              type: 'number',
+              description: 'Current page number.',
+              example: 1,
+            },
+            pageSize: {
+              type: 'number',
+              description: 'Number of items returned per page.',
+              example: 20,
+            },
+          },
+          required: ['items', 'total', 'page', 'pageSize'],
         },
       },
     },
@@ -168,7 +192,7 @@ export class ProductController {
 
   @ApiOperation({ summary: 'Update an existing product specification record' })
   @ApiResponse({
-    status: 201,
+    status: 200,
     description: 'Product updated successfully.',
     type: ProductResponseDTO,
   })
@@ -185,7 +209,7 @@ export class ProductController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description:
       'Target product ID not found within this organization context.',
   })
@@ -206,10 +230,23 @@ export class ProductController {
   @ApiOperation({
     summary: 'Soft-archive a product to hide it from standard listings',
   })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the product to archive.',
+    type: 'string',
+    example: 'cm3x8y9z00003prd901mno234',
+  })
   @ApiResponse({
-    status: 201,
+    status: 200,
     description: 'Product archived successfully.',
-    type: ProductResponseDTO,
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Product archived successfully.' },
+        data: { $ref: '#/components/schemas/ProductResponseDTO' },
+      },
+    },
   })
   @ApiResponse({
     status: 401,
@@ -220,7 +257,7 @@ export class ProductController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description:
       'Target product ID not found within this organization context.',
   })
@@ -233,16 +270,32 @@ export class ProductController {
       id,
       req.user.organizationId!,
     );
-    return ApiResponseShaper.success(response, 'Product archive successfully');
+    return ApiResponseShaper.success(
+      response,
+      'Product archived successfully.',
+    );
   }
 
   @ApiOperation({
     summary: 'Unarchive and restore a product back to regular listings',
   })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the product to restore.',
+    type: 'string',
+    example: 'cm3x8y9z00003prd901mno234',
+  })
   @ApiResponse({
-    status: 201,
-    description: 'Product unarchive successfully.',
-    type: ProductResponseDTO,
+    status: 200,
+    description: 'Product restored successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Product restored successfully.' },
+        data: { $ref: '#/components/schemas/ProductResponseDTO' },
+      },
+    },
   })
   @ApiResponse({
     status: 401,
@@ -253,7 +306,7 @@ export class ProductController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description:
       'Target product ID not found within this organization context.',
   })
@@ -268,9 +321,10 @@ export class ProductController {
     );
     return ApiResponseShaper.success(
       response,
-      'Product unarchive successfully',
+      'Product restored successfully.',
     );
   }
+
   @ApiOperation({
     summary:
       'Get a comprehensive product details record alongside analytic insights',
@@ -354,20 +408,8 @@ export class ProductController {
   })
   @ApiResponse({
     status: 200,
-    description:
-      'Products export started successfully. Returns a CSV file stream embedded in the response wrapper.',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        message: { type: 'string', example: 'Products export started' },
-        data: {
-          type: 'string',
-          format: 'binary',
-          description: 'The generated CSV file stream (text/csv).',
-        },
-      },
-    },
+    description: 'CSV file download.',
+    schema: { type: 'string', format: 'binary' },
   })
   @ApiResponse({
     status: 401,
@@ -383,7 +425,6 @@ export class ProductController {
     if (req.user.userType === Role.STAFF) {
       throw new ForbiddenException('Only owners and managers can export data.');
     }
-    console.log('export query:', q);
     const orgId = req.user.organizationId!;
     await this.service.assertExportable(orgId, q);
     this.logger.log(
@@ -425,18 +466,40 @@ export class ProductController {
         message: { type: 'string', example: 'Import preview ready' },
         data: {
           type: 'object',
-          // Adjust properties below to match your actual this.importService.preview return structure
           properties: {
-            validRowsCount: { type: 'number', example: 42 },
-            invalidRowsCount: { type: 'number', example: 3 },
-            errors: {
+            summary: {
+              type: 'object',
+              properties: {
+                create: { type: 'number', example: 30 },
+                update: { type: 'number', example: 10 },
+                unchanged: { type: 'number', example: 2 },
+                errors: { type: 'number', example: 3 },
+              },
+              required: ['create', 'update', 'unchanged', 'errors'],
+            },
+            rows: {
               type: 'array',
+              description: 'Parsed row-by-row results produced by toResults().',
               items: {
-                type: 'string',
-                example: 'Row 4: Price must be a positive number',
+                type: 'object',
+                additionalProperties: true,
+                example: {
+                  row: 2,
+                  action: 'create',
+                  sku: 'SKU-001',
+                  name: 'Sample Product',
+                  errors: [],
+                },
               },
             },
+            ignoredColumns: {
+              type: 'array',
+              description:
+                'Column headers from the uploaded file that were ignored during parsing.',
+              items: { type: 'string', example: 'extra_notes' },
+            },
           },
+          required: ['summary', 'rows', 'ignoredColumns'],
         },
       },
     },
@@ -450,6 +513,11 @@ export class ProductController {
     status: 401,
     description: 'Unauthorized access token missing or expired.',
   })
+  @ApiResponse({
+    status: 429,
+    description:
+      'Too Many Requests. Rate limit of 5 requests per minute exceeded.',
+  })
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('misc/import/preview')
   @UseInterceptors(
@@ -459,7 +527,6 @@ export class ProductController {
     @Req() req: AuthenticatedRequest,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    console.log('importPreview file:', file);
     const data = await this.importService.preview(
       req.user.organizationId!,
       file,
@@ -470,7 +537,7 @@ export class ProductController {
   @ApiOperation({
     summary: 'Commit a product catalog import file',
     description:
-      'Uploads, processes, and permanently saves product data into the database from the provided file layout.',
+      'Validates and commits product creations and updates from the uploaded CSV/Excel file within a database transaction, recording initial stock movements where applicable.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -498,9 +565,24 @@ export class ProductController {
         data: {
           type: 'object',
           properties: {
-            inserted: { type: 'number', example: 40 },
-            updated: { type: 'number', example: 2 },
+            created: {
+              type: 'number',
+              description: 'Number of new products created.',
+              example: 30,
+            },
+            updated: {
+              type: 'number',
+              description: 'Number of existing products updated.',
+              example: 10,
+            },
+            unchanged: {
+              type: 'number',
+              description:
+                'Number of rows skipped because no changes were detected.',
+              example: 2,
+            },
           },
+          required: ['created', 'updated', 'unchanged'],
         },
       },
     },
@@ -508,11 +590,25 @@ export class ProductController {
   @ApiResponse({
     status: 400,
     description:
-      'Bad Request. Parsing errors found or payload validation failed during execution.',
+      'Bad Request. File is missing, improperly formatted, exceeds size limits, or contains row validation errors.',
   })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized access token missing or expired.',
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden. Organization has reached its subscription plan product limit.',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Conflict. A SKU in the file was claimed by another concurrent operation during import.',
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests. Rate limit exceeded.',
   })
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('misc/import/commit')

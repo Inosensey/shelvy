@@ -1,20 +1,32 @@
 // src/stripe/stripe.controller.ts
-import { Controller, Post, Body, Req, UseGuards, Get } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+  Get,
+  HttpCode,
+  type RawBodyRequest,
+  BadRequestException,
+} from '@nestjs/common';
+import type { Request } from 'express';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { StripeService } from './stripe.service';
 import { ApiResponse as ApiResponseShaper } from 'src/utils/responseShaper';
-import {
-  SignupCheckoutDTO,
-  UpgradeCheckoutDTO,
-  verifyPaymentDTO,
-} from './stripe.dto';
+import { SignupCheckoutDTO, UpgradeCheckoutDTO } from './stripe.dto';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { PermissionsGuard } from 'src/guards/permission.guard';
 import type { AuthenticatedRequest } from 'src/types/request';
-import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
-  SkipThrottle,
-  Throttle,
-} from '@nestjs/throttler/dist/throttler.decorator';
+  ApiBody,
+  ApiCookieAuth,
+  ApiExcludeEndpoint,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+@ApiTags('Stripe')
 @Controller('stripe')
 export class StripeController {
   constructor(private readonly stripeService: StripeService) {}
@@ -68,6 +80,7 @@ export class StripeController {
     description:
       'Allows organization owners to upgrade their subscription tier by generating a Stripe checkout link.',
   })
+  @ApiCookieAuth('token')
   @ApiBody({ type: UpgradeCheckoutDTO })
   @ApiResponse({
     status: 201,
@@ -118,60 +131,11 @@ export class StripeController {
   }
 
   @ApiOperation({
-    summary: 'Verify payment status of a checkout session',
-    description:
-      'Checks a given Stripe transaction ID or reference data to confirm whether the payment status is marked as paid.',
-  })
-  @ApiBody({ type: verifyPaymentDTO })
-  @ApiResponse({
-    status: 201,
-    description: 'Payment verification check completed.',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        message: { type: 'string', example: 'Payment is Verified' },
-        data: {
-          type: 'boolean',
-          description:
-            'True if payment status is explicitly "paid", false otherwise.',
-          example: true,
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description:
-      'Bad Request. Session token missing or invalid lookup parameters.',
-  })
-  @Post('verify-payment')
-  async verifyPayment(@Body() data: verifyPaymentDTO) {
-    const session = await this.stripeService.getSession(data);
-    const paid = session.payment_status === 'paid';
-    return ApiResponseShaper.success(
-      paid,
-      paid ? 'Payment is Verified' : 'Payment failed to Verify',
-    );
-  }
-
-  @UseGuards(AuthGuard, PermissionsGuard)
-  @Post('cancel-subscription')
-  async cancelSubscription(
-    @Body() data: { stripeSubscriptionId: string; immediate: boolean },
-  ): Promise<ReturnType<typeof ApiResponseShaper.success>> {
-    const response = await this.stripeService.cancelSubscription(
-      data.stripeSubscriptionId,
-      data.immediate,
-    );
-    return ApiResponseShaper.success(response.data, response.message);
-  }
-
-  @ApiOperation({
     summary: 'Get subscription billing information',
     description:
       'Retrieves current subscription plan details, billing cycle boundaries, invoices, and Stripe portal linkage for the organization owner.',
   })
+  @ApiCookieAuth('token')
   @ApiResponse({
     status: 200,
     description: 'Billing information retrieved successfully.',
@@ -183,15 +147,110 @@ export class StripeController {
         data: {
           type: 'object',
           properties: {
-            planName: { type: 'string', example: 'Premium Tier' },
-            status: { type: 'string', example: 'active' },
+            plan: {
+              type: 'string',
+              enum: ['FREE', 'PREMIUM', 'ENTERPRISE'],
+              example: 'PREMIUM',
+            },
+            status: {
+              type: 'string',
+              nullable: true,
+              example: 'ACTIVE',
+            },
+            amount: {
+              type: 'number',
+              description:
+                'Subscription amount (omitted when on FREE plan without an active subscription record).',
+              example: 299,
+            },
             currentPeriodEnd: {
               type: 'string',
               format: 'date-time',
-              example: '2026-12-05T00:00:00.000Z',
+              nullable: true,
+              example: '2026-12-16T10:54:00.000Z',
             },
-            cancelAtPeriodEnd: { type: 'boolean', example: false },
+            nextPaymentDate: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-12-16T10:54:00.000Z',
+            },
+            cancelAtPeriodEnd: {
+              type: 'boolean',
+              example: false,
+            },
+            canceledAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: null,
+            },
+            failedAttempts: {
+              type: 'number',
+              example: 0,
+            },
+            lastPaymentError: {
+              type: 'string',
+              nullable: true,
+              example: null,
+            },
+            payments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', example: 'cm3x8y9z00000pay123abc456' },
+                  amount: {
+                    type: 'number',
+                    description:
+                      'Payment amount in major currency units (e.g., USD).',
+                    example: 299,
+                  },
+                  currency: { type: 'string', example: 'usd' },
+                  status: { type: 'string', example: 'SUCCEEDED' },
+                  periodStart: {
+                    type: 'string',
+                    format: 'date-time',
+                    nullable: true,
+                    example: '2026-11-16T10:54:00.000Z',
+                  },
+                  periodEnd: {
+                    type: 'string',
+                    format: 'date-time',
+                    nullable: true,
+                    example: '2026-12-16T10:54:00.000Z',
+                  },
+                  createdAt: {
+                    type: 'string',
+                    format: 'date-time',
+                    example: '2026-11-16T10:54:00.000Z',
+                  },
+                  failureReason: {
+                    type: 'string',
+                    nullable: true,
+                    example: null,
+                  },
+                },
+              },
+            },
+            limits: {
+              type: 'object',
+              description: 'Plan limits derived from PLAN_LIMITS[orgPlan].',
+              additionalProperties: true,
+              example: { products: null, members: 10 },
+            },
+            usage: {
+              type: 'object',
+              nullable: true,
+              description:
+                'Current resource usage, or null if user has no organization.',
+              properties: {
+                products: { type: 'number', example: 42 },
+                members: { type: 'number', example: 3 },
+              },
+            },
           },
+          required: ['plan', 'status', 'payments', 'limits', 'usage'],
         },
       },
     },
@@ -220,6 +279,7 @@ export class StripeController {
     description:
       'Sets the subscription status to cancel automatically at the close of the current paid billing cycle, preventing future charges.',
   })
+  @ApiCookieAuth('token')
   @ApiResponse({
     status: 200,
     description: 'Subscription cancellation scheduled successfully.',
@@ -267,6 +327,7 @@ export class StripeController {
     description:
       'Reverses a pending subscription cancellation, ensuring continuous service and auto-billing at the end of the period.',
   })
+  @ApiCookieAuth('token')
   @ApiResponse({
     status: 200,
     description: 'Subscription auto-renewal reactivated successfully.',
@@ -308,6 +369,7 @@ export class StripeController {
     description:
       'Generates a short-lived link to the hosted Stripe Customer Portal, allowing organization owners to manage saved payment methods, billing details, and view invoice history natively.',
   })
+  @ApiCookieAuth('token')
   @ApiResponse({
     status: 201,
     description: 'Stripe Customer Portal session link generated successfully.',
@@ -349,14 +411,14 @@ export class StripeController {
   }
 
   @SkipThrottle()
+  @ApiExcludeEndpoint()
+  @HttpCode(200)
   @Post('webhook')
-  async handleWebhook(@Req() request: Request) {
-    const signature = request.headers['stripe-signature'] as string;
-    interface RequestWithRawBody extends Request {
-      rawBody: Buffer;
+  async handleWebhook(@Req() req: RawBodyRequest<Request>) {
+    const signature = req.headers['stripe-signature'];
+    if (typeof signature !== 'string' || !req.rawBody) {
+      throw new BadRequestException('Missing Stripe signature or body');
     }
-    const rawBody = (request as RequestWithRawBody).rawBody;
-
-    await this.stripeService.handleWebhook(rawBody, signature);
+    await this.stripeService.handleWebhook(req.rawBody, signature);
   }
 }
