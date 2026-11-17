@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 
@@ -28,19 +29,19 @@ export function AuthCard({
           {topRightSlot}
         </div>
       )}
-      {/* Wordmark slot -- swap for your icon whenever it's ready */}
       <Link href="/" className="mb-8 flex flex-col items-center gap-3">
         <div
           aria-hidden
-          className="h-9 w-9 rounded-md border border-dashed border-linen/25"
-        />
+          className="h-9 w-9 rounded-md"
+        >
+          <Image src={"/icon.svg"} alt="Shelvy Icon" width={36} height={36} />
+        </div>
         <span className="font-display text-lg italic text-linen/70">
           Shelvy
         </span>
       </Link>
       <div className={`w-full ${maxWidthClassName}`}>
         <div className="relative overflow-hidden rounded-xl border border-linen/10 bg-surface shadow-[0_1px_0_0_rgba(220,215,201,0.05)_inset]">
-          {/* Signature hairline: a soft clay gradient tracing the top edge */}
           <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-clay/70 to-transparent" />
 
           <div className="px-8 py-9">
