@@ -24,7 +24,22 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60_000, limit: 120 }],
+      errorMessage: (_context, detail) => {
+        const seconds = Math.max(
+          1,
+          Math.ceil(
+            detail.isBlocked ? detail.timeToBlockExpire : detail.timeToExpire,
+          ),
+        );
+        const wait =
+          seconds >= 60
+            ? `${Math.ceil(seconds / 60)} minute(s)`
+            : `${seconds} seconds`;
+        return `Too many requests. Please try again in ${wait}.`;
+      },
+    }),
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     DatabaseModule,

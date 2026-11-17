@@ -7,25 +7,15 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/PrismaConfig/prisma.service';
+import { allowedOrigins } from 'src/utils/allowedOrigins';
 
-// 1. Define the shape of your verified JWT payload
-// interface JwtPayload {
-//   userId: string;
-//   userType: string;
-//   organizationId: string | null;
-// }
-
-// 2. Define the shape of the custom metadata you want to attach to the socket
 interface SocketData {
   userId: string;
   organizationId: string | null;
 }
 
 @WebSocketGateway({
-  cors: {
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
-  },
+  cors: { origin: allowedOrigins(), credentials: true },
 })
 export class NotificationGateway
   implements OnGatewayConnection, OnGatewayDisconnect

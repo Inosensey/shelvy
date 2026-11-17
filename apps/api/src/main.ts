@@ -1,8 +1,8 @@
+import * as dotenv from 'dotenv';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
-import * as dotenv from 'dotenv';
 import * as bodyParser from 'body-parser';
 import { PrismaExceptionFilter } from './PrismaExceptionFilter';
 import { HttpExceptionFilter } from './HttpExceptionFilter';
@@ -10,6 +10,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { useContainer } from 'class-validator';
 import { IncomingMessage } from 'http';
 import { NestExpressApplication } from '@nestjs/platform-express/interfaces/nest-express-application.interface';
+import helmet from 'helmet';
+import { allowedOrigins } from './utils/allowedOrigins';
 dotenv.config();
 
 async function bootstrap() {
@@ -17,6 +19,15 @@ async function bootstrap() {
     rawBody: true,
   });
   app.set('trust proxy', 1);
+  app.use(helmet({ contentSecurityPolicy: false }));
+
+  app.enableCors({
+    origin: allowedOrigins(),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
   app.use(
     '/stripe/webhook',
     bodyParser.raw({
@@ -37,7 +48,6 @@ async function bootstrap() {
     .addTag('users', 'User management endpoints')
     .addBearerAuth()
     .addCookieAuth('token')
-    .setExternalDoc('Postman Collection', '/api-json')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -54,15 +64,6 @@ async function bootstrap() {
     customSiteTitle: 'Shelvy API Docs',
   });
   // -------------------------------------------------
-
-  app.enableCors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
-
-  app.use('/stripe/webhook', bodyParser.raw({ type: 'application/json' }));
 
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ extended: true }));
