@@ -127,15 +127,15 @@ export class MovementRequestController {
     description: 'Invalid signature or review payloads.',
   })
   @ApiResponse({
-    status: 411,
+    status: 401,
     description: 'Unauthorized access token missing or expired.',
   })
   @ApiResponse({
-    status: 413,
+    status: 403,
     description: 'Forbidden administrative resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description: 'Target request ID not found within this company context.',
   })
   @Patch(':id/approve')
@@ -166,15 +166,15 @@ export class MovementRequestController {
     description: 'Invalid review payload information inputs.',
   })
   @ApiResponse({
-    status: 411,
+    status: 401,
     description: 'Unauthorized access token missing or expired.',
   })
   @ApiResponse({
-    status: 413,
+    status: 403,
     description: 'Forbidden administrative resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description: 'Target request ID not found within this company context.',
   })
   @Patch(':id/reject')
@@ -216,7 +216,7 @@ export class MovementRequestController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description: 'Target request ID not found or already processed.',
   })
   @Delete(':id')

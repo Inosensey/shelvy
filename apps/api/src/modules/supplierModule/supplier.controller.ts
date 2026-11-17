@@ -151,7 +151,7 @@ export class SuppliersController {
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description: 'Supplier record not found within this organization context.',
   })
   @Patch(':id')
@@ -182,15 +182,15 @@ export class SuppliersController {
     },
   })
   @ApiResponse({
-    status: 411,
+    status: 401,
     description: 'Unauthorized access token missing or expired.',
   })
   @ApiResponse({
-    status: 413,
+    status: 403,
     description: 'Forbidden access resource permissions error.',
   })
   @ApiResponse({
-    status: 444,
+    status: 404,
     description: 'Supplier record not found within this organization context.',
   })
   @Delete(':id')

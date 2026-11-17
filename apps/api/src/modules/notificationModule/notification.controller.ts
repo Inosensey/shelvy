@@ -47,9 +47,25 @@ export class NotificationController {
           type: 'array',
           items: {
             type: 'object',
-            // Adjust these properties to match your actual Notification model or swap with $ref
             properties: {
-              id: { type: 'string', example: 'notif_123abc' },
+              id: { type: 'string', example: 'cm3x8y9z00000abc123def456' },
+              organizationId: {
+                type: 'string',
+                example: 'cm3x8y9z00001org789ghi012',
+              },
+              userId: { type: 'string', example: 'cm3x8y9z00002usr345jkl678' },
+              type: {
+                type: 'string',
+                enum: [
+                  'MEMBER_JOINED',
+                  'LOW_STOCK',
+                  'STOCK_MOVEMENT',
+                  'PAYMENT_FAILED',
+                  'MOVEMENT_REQUESTED',
+                  'MOVEMENT_DECIDED',
+                ],
+                example: 'LOW_STOCK',
+              },
               title: { type: 'string', example: 'Low Stock Alert' },
               message: {
                 type: 'string',
@@ -59,7 +75,22 @@ export class NotificationController {
               createdAt: {
                 type: 'string',
                 format: 'date-time',
-                example: '2026-11-13T09:50:00.000Z',
+                example: '2026-11-16T10:35:00.000Z',
+              },
+              metadata: {
+                type: 'object',
+                nullable: true,
+                additionalProperties: true,
+                example: {
+                  productId: 'cm3x8y9z00003prd901mno234',
+                  currentStock: 3,
+                },
+              },
+              emailedAt: {
+                type: 'string',
+                format: 'date-time',
+                nullable: true,
+                example: null,
               },
             },
           },
@@ -126,7 +157,7 @@ export class NotificationController {
     name: 'id',
     description: 'The unique identifier of the notification to mark as read.',
     type: 'string',
-    example: 'notif_123abc',
+    example: 'cmviyr5nx000101bemlzzrrmm',
   })
   @ApiResponse({
     status: 200,
@@ -139,7 +170,7 @@ export class NotificationController {
         data: {
           type: 'object',
           properties: {
-            id: { type: 'string', example: 'notif_123abc' },
+            id: { type: 'string', example: 'cmviyr5nx000101bemlzzrrmm' },
             isRead: { type: 'boolean', example: true },
           },
         },
@@ -166,7 +197,30 @@ export class NotificationController {
     );
   }
 
-  @ApiOperation({ summary: 'Mark all notifications as read' })
+  @ApiOperation({
+    summary: 'Mark all notifications as read',
+    description:
+      'Marks all unread notifications belonging to the currently authenticated user as read.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All notifications marked as read successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'All notifications marked as read',
+        },
+        data: { type: 'object', nullable: true, example: null },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized access token missing or expired.',
+  })
   @Patch('read-all')
   async markAllAsRead(@Req() req: AuthenticatedRequest) {
     await this.notificationService.markAllAsRead(req.user.userId);
@@ -176,7 +230,7 @@ export class NotificationController {
   @ApiOperation({
     summary: 'Get my notification settings',
     description:
-      'Retrieves the notification preferences (such as email, push, and alert triggers) for the currently authenticated user.',
+      'Retrieves the notification preferences (such as email notification preferences) for the currently authenticated user.',
   })
   @ApiResponse({
     status: 200,
@@ -188,11 +242,16 @@ export class NotificationController {
         message: { type: 'string', example: 'Notification settings retrieved' },
         data: {
           type: 'object',
-          // Adjust these properties to match your actual notification settings model
           properties: {
-            emailNotifications: { type: 'boolean', example: true },
-            lowStockAlerts: { type: 'boolean', example: true },
-            orderUpdates: { type: 'boolean', example: false },
+            emailMode: {
+              type: 'string',
+              enum: ['OFF', 'IF_UNREAD', 'IMMEDIATE'],
+              example: 'IF_UNREAD',
+            },
+            emailLowStock: { type: 'boolean', example: true },
+            emailRequests: { type: 'boolean', example: true },
+            emailDecisions: { type: 'boolean', example: true },
+            emailMembers: { type: 'boolean', example: true },
           },
         },
       },
@@ -224,11 +283,16 @@ export class NotificationController {
         message: { type: 'string', example: 'Notification settings saved' },
         data: {
           type: 'object',
-          // Adjust these properties to match your actual notification settings model
           properties: {
-            emailNotifications: { type: 'boolean', example: true },
-            lowStockAlerts: { type: 'boolean', example: false },
-            orderUpdates: { type: 'boolean', example: false },
+            emailMode: {
+              type: 'string',
+              enum: ['OFF', 'IF_UNREAD', 'IMMEDIATE'],
+              example: 'IF_UNREAD',
+            },
+            emailLowStock: { type: 'boolean', example: true },
+            emailRequests: { type: 'boolean', example: true },
+            emailDecisions: { type: 'boolean', example: true },
+            emailMembers: { type: 'boolean', example: true },
           },
         },
       },
