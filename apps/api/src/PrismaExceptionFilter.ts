@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nestjs';
 import { Prisma } from 'generated/prisma/client';
 
 import { ArgumentsHost, Catch, ExceptionFilter, Logger } from '@nestjs/common';
@@ -16,6 +17,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     // Handle Database Connection / Initialization Errors
     if (exception instanceof Prisma.PrismaClientInitializationError) {
+      Sentry.captureException(exception);
       this.logger.error(
         `Database initialization failure: ${exception.message}`,
       );
@@ -53,6 +55,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
           });
 
         default:
+          Sentry.captureException(exception);
           this.logger.error(
             `Prisma database error [${exception.code}]: ${exception.message}`,
           );
@@ -67,6 +70,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     }
 
     // Fallback
+    Sentry.captureException(exception);
     this.logger.error('Unhandled database exception', exception);
 
     return response.status(500).json({

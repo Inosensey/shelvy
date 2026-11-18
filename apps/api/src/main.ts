@@ -1,4 +1,5 @@
-import * as dotenv from 'dotenv';
+import 'dotenv/config';
+import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
@@ -12,7 +13,7 @@ import { IncomingMessage } from 'http';
 import { NestExpressApplication } from '@nestjs/platform-express/interfaces/nest-express-application.interface';
 import helmet from 'helmet';
 import { allowedOrigins } from './utils/allowedOrigins';
-dotenv.config();
+import { AllExceptionsFilter } from './AllExceptionsFilter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -69,7 +70,11 @@ async function bootstrap() {
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
-  app.useGlobalFilters(new HttpExceptionFilter(), new PrismaExceptionFilter());
+  app.useGlobalFilters(
+    new AllExceptionsFilter(),
+    new HttpExceptionFilter(),
+    new PrismaExceptionFilter(),
+  );
   await app.listen(process.env.PORT ?? 3001);
 }
 bootstrap();

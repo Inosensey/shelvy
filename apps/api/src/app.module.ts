@@ -21,9 +21,11 @@ import { ClientIpThrottlerGuard } from './guards/clientIpThrottler.guard';
 import { APP_GUARD } from '@nestjs/core/constants';
 import { PlanModule } from './modules/planModule/plan.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { SentryModule } from '@sentry/nestjs/setup';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 120 }],
       errorMessage: (_context, detail) => {
