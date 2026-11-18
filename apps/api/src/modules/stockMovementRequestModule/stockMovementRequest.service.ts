@@ -13,6 +13,7 @@ import {
 } from './stockMovementRequest.dto';
 import { StockMovementRequestRepository } from './stockMovementRequest.repository';
 import { UserService } from '../usersModule/user.service';
+import { StockChangedEvent } from '../stockMovementModule/events/stockChange.event';
 
 @Injectable()
 export class StockMovementRequestService {
@@ -72,11 +73,23 @@ export class StockMovementRequestService {
     deciderId: string,
     dto: DecisionDTO,
   ) {
-    const { request } = await this.stockMovementRequestRepo.approve(
+    const { request, applied } = await this.stockMovementRequestRepo.approve(
       id,
       organizationId,
       deciderId,
       dto,
+    );
+
+    this.eventBus.publish(
+      new StockChangedEvent(
+        organizationId,
+        applied.product.id,
+        applied.product.name,
+        applied.previousStock,
+        applied.product.stock,
+        applied.product.lowStockThreshold,
+        request.requestedById,
+      ),
     );
 
     this.eventBus.publish(
@@ -89,17 +102,6 @@ export class StockMovementRequestService {
         dto.decisionNote ?? null,
       ),
     );
-    // this.eventBus.publish(
-    //   new StockChangedEvent(
-    //     organizationId,
-    //     applied.product.id,
-    //     applied.product.name,
-    //     applied.previousStock,
-    //     applied.product.stock,
-    //     applied.product.lowStockThreshold,
-    //     request.requestedById,
-    //   ),
-    // );
     return request;
   }
 

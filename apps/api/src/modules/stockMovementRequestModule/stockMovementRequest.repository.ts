@@ -98,7 +98,6 @@ export class StockMovementRequestRepository {
     dto: DecisionDTO,
   ) {
     const { request, applied } = await this.prisma.$transaction(async (tx) => {
-      // Claim: only one approver wins, and only while PENDING.
       const claimed = await tx.stockMovementRequest.updateMany({
         where: { id, organizationId, status: 'PENDING' },
         data: {
@@ -117,8 +116,6 @@ export class StockMovementRequestRepository {
         where: { id },
       });
 
-      console.log('req', req);
-
       const stockMovementPayload: RecordMovementDTO = {
         productId: req.productId,
         quantity: req.quantity,
@@ -127,7 +124,8 @@ export class StockMovementRequestRepository {
         reason: req.reason,
       };
 
-      const applied = await this.stockMovementService.recordStockMovement(
+      const applied = await this.stockMovementService.applyInTransaction(
+        tx,
         organizationId,
         req.requestedById,
         stockMovementPayload,

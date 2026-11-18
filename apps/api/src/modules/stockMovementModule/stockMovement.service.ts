@@ -11,6 +11,7 @@ import {
   manilaDateTime,
   MAX_EXPORT_ROWS,
 } from 'src/utils/csv.util';
+import { Prisma } from 'generated/prisma/client';
 
 @Injectable()
 export class StockMovementService {
@@ -41,6 +42,24 @@ export class StockMovementService {
       page,
       pageSize,
     };
+  }
+
+  async applyInTransaction(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    userId: string,
+    dto: RecordMovementDTO,
+  ) {
+    // No events here: the caller publishes them after its transaction commits.
+    return this.stockMovementRepo.applyMovement(tx, {
+      organizationId,
+      productId: dto.productId,
+      performedById: userId,
+      type: dto.type,
+      delta: toDelta(dto),
+      reason: dto.reason,
+      note: dto.note,
+    });
   }
 
   async recordStockMovement(
