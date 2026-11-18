@@ -1,4 +1,5 @@
 // guards/auth.guard.ts
+import * as Sentry from '@sentry/nestjs';
 import {
   CanActivate,
   ExecutionContext,
@@ -39,6 +40,8 @@ export class AuthGuard implements CanActivate {
     });
 
     if (!user) throw new UnauthorizedException('User no longer exists');
+
+    Sentry.setUser({ id: userId });
 
     (request as AuthenticatedRequest).user = {
       userId: user.id,
