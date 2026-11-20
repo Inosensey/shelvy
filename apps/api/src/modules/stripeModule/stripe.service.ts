@@ -90,7 +90,6 @@ export class StripeService {
   async createUpgradeCheckout(userId: string, plan: PaidPlan, priceId: string) {
     const user = await this.authService.getUserById(userId);
     if (!user) throw new NotFoundException('User not found.');
-    console.log(user);
     if (user.subscriptionPlan !== SubscriptionPlan.FREE) {
       throw new ConflictException(
         'You already have a paid plan. Manage it from Billing.',
@@ -325,11 +324,15 @@ export class StripeService {
       password?: string;
       plan: string;
     };
-    const subscriptionPlan =
-      plan === 'premium'
-        ? SubscriptionPlan.PREMIUM
-        : SubscriptionPlan.ENTERPRISE;
-    const stripeSubscriptionId = session.subscription as string; // sub_..., not session.id
+    const PAID_PLANS = [SubscriptionPlan.PREMIUM, SubscriptionPlan.ENTERPRISE];
+    const subscriptionPlan = PAID_PLANS.find((p) => p === plan?.toUpperCase());
+
+    if (!subscriptionPlan) {
+      this.logger.error(`Checkout ${session.id}: unknown plan "${plan}"`);
+      return; // no throw, so Stripe doesn't keep retrying
+    }
+
+    const stripeSubscriptionId = session.subscription as string;
     const customerId = session.customer as string;
 
     const stripeSub =
