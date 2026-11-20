@@ -22,7 +22,7 @@ export const PLANS: Plan[] = [
   {
     id: "PREMIUM",
     name: "Premium",
-    price: "₱799",
+    price: "$299.99",
     period: "/month",
     description: "For growing teams.",
     features: [
@@ -36,7 +36,7 @@ export const PLANS: Plan[] = [
   {
     id: "ENTERPRISE",
     name: "Enterprise",
-    price: "₱2,499",
+    price: "$599.99",
     period: "/month",
     description: "For larger operations.",
     features: [
