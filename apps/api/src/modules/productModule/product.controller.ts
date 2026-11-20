@@ -489,6 +489,7 @@ export class ProductController {
                   sku: 'SKU-001',
                   name: 'Sample Product',
                   errors: [],
+                  initialStock: 15,
                 },
               },
             },

@@ -221,6 +221,23 @@ export function ImportProductsModal({ onClose }: { onClose: () => void }) {
                       </td>
                       <td className="px-3 py-2 text-linen">{r.name || "—"}</td>
                       <td className="px-3 py-2 text-xs">
+                        {r.action === "create" && (r.initialStock ?? 0) > 0 && (
+                          <p className="text-linen/60">
+                            Opening stock: {r.initialStock}
+                          </p>
+                        )}
+                        {r.errors.map((m) => (
+                          <p key={m} className="text-red-400">
+                            {m}
+                          </p>
+                        ))}
+                        {r.warnings.map((m) => (
+                          <p key={m} className="text-amber-400">
+                            {m}
+                          </p>
+                        ))}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
                         {r.errors.map((m) => (
                           <p key={m} className="text-red-400">
                             {m}

@@ -24,7 +24,11 @@ const ALLOWED = [
   'low_stock_alert',
   'initial_stock',
 ];
-const IGNORED = ['stock', 'status', 'created']; // present in our own export files
+const IGNORED = ['status', 'created'];
+const ALIASES: Record<string, string> = {
+  stock: 'initial_stock',
+  low_stock: 'low_stock_alert',
+};
 const REQUIRED = ['name', 'price'];
 
 // eslint-disable-next-line no-control-regex
@@ -54,6 +58,7 @@ export interface ImportRowResult {
   errors: string[];
   warnings: string[];
   generatedSku: boolean;
+  initialStock: number | null;
 }
 
 const clean = (v: string | undefined) =>
@@ -110,7 +115,10 @@ export class ProductImportService {
         skip_empty_lines: true,
         trim: true,
         columns: (h: string[]) => {
-          header = h.map((c) => c.trim().toLowerCase().replace(/\s+/g, '_'));
+          header = h.map((c) => {
+            const key = c.trim().toLowerCase().replace(/\s+/g, '_');
+            return ALIASES[key] ?? key;
+          });
           return header;
         },
       });
@@ -387,6 +395,7 @@ export class ProductImportService {
       errors: p.errors,
       warnings: p.warnings,
       generatedSku: p.generatedSku,
+      initialStock: p.action === 'create' ? (p.dto.initialStock ?? 0) : null,
     }));
   }
 

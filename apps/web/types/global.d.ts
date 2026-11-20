@@ -225,6 +225,7 @@ interface ImportRowResult {
   errors: string[];
   warnings: string[];
   generatedSku: boolean;
+  initialStock: number | null;
 }
 
 interface ImportPreview {
