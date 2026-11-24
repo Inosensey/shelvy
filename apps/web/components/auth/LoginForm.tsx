@@ -11,6 +11,7 @@ import { validateGroupInput, checkValidations } from "@/utils/validation";
 import type { formValidation } from "@/utils/validation.types";
 import { FormMessage } from "../reusable/FormMessage";
 import { safeRedirect } from "@/lib/safeRedirect";
+import { DemoSignIn } from "./DemoSignIn";
 
 const initialFormState: ApiResponse<{ userId: string } | null> = {
   success: false,
@@ -20,27 +21,36 @@ const initialFormState: ApiResponse<{ userId: string } | null> = {
 
 const initialValidation: formValidation = {
   email: { validationName: "email", valid: true, validationMessage: "" },
-  loginPassword: { validationName: "loginPassword", valid: true, validationMessage: "" },
+  loginPassword: {
+    validationName: "loginPassword",
+    valid: true,
+    validationMessage: "",
+  },
 };
 
 interface props {
-  redirectTo?: string
+  redirectTo?: string;
 }
 
-export function LoginForm({redirectTo}:props) {
+export function LoginForm({ redirectTo }: props) {
   const router = useRouter();
 
-  const [formState, formAction, isPending] = useActionState(signIn, initialFormState);
+  const [formState, formAction, isPending] = useActionState(
+    signIn,
+    initialFormState,
+  );
 
   const [values, setValues] = useState({ email: "", loginPassword: "" });
-  const [validation, setValidation] = useState<formValidation>(initialValidation);
+  const [validation, setValidation] =
+    useState<formValidation>(initialValidation);
   const [submitMessage, setSubmitMessage] = useState("");
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setValues((prev) => ({ ...prev, [name]: value }));
 
-    const rule = loginValidationRules[name as keyof typeof loginValidationRules];
+    const rule =
+      loginValidationRules[name as keyof typeof loginValidationRules];
     if (rule) {
       setValidation((prev) => ({ ...prev, [name]: rule(value) }));
     }
@@ -58,7 +68,10 @@ export function LoginForm({redirectTo}:props) {
 
     if (formState.success) {
       setSubmitMessage(formState.message);
-      const timer = setTimeout(() => router.push(safeRedirect(redirectTo)), 1200);
+      const timer = setTimeout(
+        () => router.push(safeRedirect(redirectTo)),
+        1200,
+      );
       return () => clearTimeout(timer);
     }
 
@@ -67,46 +80,58 @@ export function LoginForm({redirectTo}:props) {
   }, [formState]);
 
   return (
-    <form action={formAction} onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <motion.fieldset
-        disabled={isPending}
-        animate={{ opacity: isPending ? 0.6 : 1 }}
-        transition={{ duration: 0.2 }}
-        className="m-0 flex flex-col gap-4 border-0 p-0"
+    <>
+      <form
+        action={formAction}
+        onSubmit={handleSubmit}
+        noValidate
+        className="flex flex-col gap-4"
       >
-        <AuthInput
-          id="email"
-          name="email"
-          type="email"
-          label="Email address"
-          autoComplete="email"
-          value={values.email}
-          onChange={handleChange}
-          valid={validation.email.valid}
-          validationMessage={validation.email.validationMessage}
-        />
+        <motion.fieldset
+          disabled={isPending}
+          animate={{ opacity: isPending ? 0.6 : 1 }}
+          transition={{ duration: 0.2 }}
+          className="m-0 flex flex-col gap-4 border-0 p-0"
+        >
+          <AuthInput
+            id="email"
+            name="email"
+            type="email"
+            label="Email address"
+            autoComplete="email"
+            value={values.email}
+            onChange={handleChange}
+            valid={validation.email.valid}
+            validationMessage={validation.email.validationMessage}
+          />
 
-        <AuthInput
-          id="loginPassword"
-          name="loginPassword"
-          type="password"
-          label="Password"
-          autoComplete="current-password"
-          value={values.loginPassword}
-          onChange={handleChange}
-          valid={validation.loginPassword.valid}
-          validationMessage={validation.loginPassword.validationMessage}
-        />
-      </motion.fieldset>
+          <AuthInput
+            id="loginPassword"
+            name="loginPassword"
+            type="password"
+            label="Password"
+            autoComplete="current-password"
+            value={values.loginPassword}
+            onChange={handleChange}
+            valid={validation.loginPassword.valid}
+            validationMessage={validation.loginPassword.validationMessage}
+          />
+        </motion.fieldset>
 
-      {submitMessage && (
-        
-<FormMessage message={submitMessage} success={formState.success} />
-      )}
+        {submitMessage && (
+          <FormMessage message={submitMessage} success={formState.success} />
+        )}
 
-      <AuthButton type="submit" loading={isPending || formState.success} loadingText="Signing in…" className="mt-1">
-        Sign in
-      </AuthButton>
-    </form>
+        <AuthButton
+          type="submit"
+          loading={isPending || formState.success}
+          loadingText="Signing in…"
+          className="mt-1"
+        >
+          Sign in
+        </AuthButton>
+      </form>
+      <DemoSignIn redirectTo={redirectTo} />
+    </>
   );
 }

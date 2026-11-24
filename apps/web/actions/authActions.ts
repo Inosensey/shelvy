@@ -10,6 +10,33 @@ const PAID_PLAN_VALUES = {
   ENTERPRISE: "ENTERPRISE",
 } as const;
 
+const DEMO_ROLES = ["OWNER", "MANAGER", "STAFF"] as const;
+
+export const demoSignIn = async (
+  role: string,
+): Promise<ApiResponse<{ userId: string } | null>> => {
+  if (!DEMO_ROLES.includes(role as (typeof DEMO_ROLES)[number])) {
+    return { success: false, data: null, message: "Invalid demo role." };
+  }
+
+  try {
+    return await nestJsEndpoints.authApi.demoSignIn({
+      role: role as (typeof DEMO_ROLES)[number],
+    });
+  } catch (error) {
+    console.log(error);
+    return {
+      success: false,
+      data: null,
+      message:
+        error instanceof Error
+          ? `There is an error starting the demo: ${error.message}`
+          : "An unknown error occurred",
+    };
+  }
+};
+
+
 function readCredentials(formData: FormData) {
   const email = (formData.get("email") as string) ?? "";
   const password = (formData.get("password") as string) ?? "";

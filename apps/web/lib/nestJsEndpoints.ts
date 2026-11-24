@@ -203,6 +203,29 @@ class NestJsEndpoints {
 
       return response;
     },
+    demoSignIn: async (data: {
+      role: "OWNER" | "MANAGER" | "STAFF";
+    }): Promise<
+      ApiResponse<{ userId: string; email: string; userType: string } | null>
+    > => {
+      const response: ApiResponse<{
+        userId: string;
+        email: string;
+        userType: string;
+      } | null> = await this.request(
+        "/auth/demo-sign-in",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+        true, // persist the session cookie, same as signIn
+      );
+
+      if (response.success && response.data)
+        await this.setUserData(response.data.userId, response.data.email);
+
+      return response;
+    },
     signOut: async () => {
       return this.request("/auth/sign-out", {
         method: "POST",
