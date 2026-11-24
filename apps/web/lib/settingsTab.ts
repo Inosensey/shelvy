@@ -1,7 +1,7 @@
 export const ALL_TABS = [
   { key: "profile", label: "Profile", ownerOnly: false },
   { key: "security", label: "Security", ownerOnly: false },
-  { key: "organization", label: "Organization", ownerOnly: false },
+  { key: "organization", label: "Organization", ownerOnly: true },
   { key: "billing", label: "Billing", ownerOnly: true },
   { key: "notifications", label: "Notifications", ownerOnly: false },
 ] as const;
