@@ -6,11 +6,15 @@ import {
   MinLength,
   MaxLength,
   IsStrongPassword,
+  IsIn,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserResponseDTO } from 'src/modules/usersModule/user.dto';
 import { SubscriptionPlan } from 'generated/prisma/client';
+
+export const DEMO_ROLES = ['OWNER', 'MANAGER', 'STAFF'] as const;
+export type DemoSignInRole = (typeof DEMO_ROLES)[number];
 
 // ============================================
 // REGISTER DTO
@@ -88,6 +92,13 @@ export class LoginDTO {
   @IsNotEmpty({ message: 'Password is required.' })
   password!: string;
 }
+
+export class DemoSignInDTO {
+  @ApiProperty({ enum: DEMO_ROLES })
+  @IsIn(DEMO_ROLES)
+  role!: DemoSignInRole;
+}
+
 // ============================================
 // AUTH RESPONSE (login/register)
 // ============================================

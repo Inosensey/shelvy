@@ -7,6 +7,7 @@ import {
   Post,
   Req,
   Res,
+  ServiceUnavailableException,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -35,10 +36,13 @@ import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
 
 // DTOs
-import { RegisterDTO, LoginDTO } from './auth.dto';
+import { RegisterDTO, LoginDTO, DemoSignInDTO } from './auth.dto';
 import { UserResponseDTO } from 'src/modules/usersModule/user.dto';
 import { Role, SubscriptionPlan } from 'generated/prisma/enums';
 import type { AuthenticatedRequest } from 'src/types/request';
+import { DemoService } from '../demoModule/demo.service';
+import { DEMO } from '../demoModule/demo.data';
+import { assertNotDemo } from '../demoModule/demo.util';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -46,6 +50,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly sessionService: SessionService,
+    private readonly demoService: DemoService,
   ) {}
 
   @ApiOperation({
@@ -111,6 +116,45 @@ export class AuthController {
         userType: result.userType,
       },
       'Signed in successfully. Connecting to Dashboard...',
+    );
+  }
+
+  @UseGuards(AlreadyAuthGuard)
+  @Post('demo-sign-in')
+  @HttpCode(200)
+  @UseInterceptors(CookieCheckInterceptor)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async demoSignIn(
+    @Body() { role }: DemoSignInDTO,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const password = process.env.DEMO_PASSWORD;
+    if (!password) {
+      throw new ServiceUnavailableException('Demo is not available.');
+    }
+
+    await this.demoService.resetIfStale();
+
+    const credentials: LoginDTO = {
+      email: DEMO.users[role].email,
+      password,
+    };
+
+    const result = await this.authService.signIn(credentials);
+
+    response.cookie('token', result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    return ApiResponseShaper.success(
+      {
+        userId: result.userId,
+        email: result.email,
+        userType: result.userType,
+      },
+      'Signed in to the demo. Connecting to Dashboard...',
     );
   }
 
@@ -254,6 +298,7 @@ export class AuthController {
   @HttpCode(200)
   @UseGuards(AuthGuard)
   async revokeAllUserSessions(@Req() req: AuthenticatedRequest) {
+    assertNotDemo(req.user.userId);
     const count = await this.sessionService.revokeAllUserSessions(
       req.user.userId,
       req.cookies?.token as string,
