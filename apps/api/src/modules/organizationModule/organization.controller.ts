@@ -38,6 +38,7 @@ import {
 import type { AuthenticatedRequest } from 'src/types/request';
 import { plainToInstance } from 'class-transformer';
 import { AllowWithoutOrganization } from 'src/decorators/allowWithoutOrg.decorator';
+import { assertNotDemo } from '../demoModule/demo.util';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -111,6 +112,7 @@ export class OrganizationController {
     @Param('token') token: string,
     @Req() req: AuthenticatedRequest,
   ) {
+    assertNotDemo(req.user.userId);
     await this.orgService.assertOwnerOrg(req);
     const updatedInvite = await this.orgService.revokeInvite(
       token,
@@ -153,6 +155,7 @@ export class OrganizationController {
     @Body() data: SendInviteEmailDTO,
     @Req() req: AuthenticatedRequest,
   ) {
+    assertNotDemo(req.user.userId);
     await this.orgService.assertOwnerOrg(req);
     await this.orgService.sendInviteEmail(data, req.user.userId);
     return ApiResponseShaper.success(null, 'Invite email sent successfully');
@@ -184,6 +187,7 @@ export class OrganizationController {
     @Param('token') token: string,
     @Req() req: AuthenticatedRequest,
   ) {
+    assertNotDemo(req.user.userId);
     await this.orgService.assertOwnerOrg(req);
     const updatedInviteRecord = await this.orgService.resendInvite(
       token,
@@ -396,6 +400,7 @@ export class OrganizationController {
     @Param('memberId') memberId: string,
     @Req() req: AuthenticatedRequest,
   ) {
+    assertNotDemo(req.user.userId);
     await this.orgService.assertOwnerOrg(req);
     const removedId = await this.orgService.removeOrgMember(
       memberId,
@@ -509,6 +514,7 @@ export class OrganizationController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: UpdateOrganizationDTO,
   ) {
+    assertNotDemo(req.user.userId);
     const org = await this.orgService.updateMyOrganization(
       req.user.organizationId!,
       req.user.userType,

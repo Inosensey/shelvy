@@ -22,6 +22,7 @@ import { ApiResponse as ApiResponseShaper } from 'src/utils/responseShaper';
 import type { AuthenticatedRequest } from 'src/types/request';
 import { PermissionsGuard } from 'src/guards/permission.guard';
 import { UpdateNotificationSettingDTO } from './notification.dto';
+import { assertNotDemo } from '../demoModule/demo.util';
 
 @ApiTags('notifications')
 @ApiCookieAuth('token')
@@ -311,6 +312,7 @@ export class NotificationController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: UpdateNotificationSettingDTO,
   ) {
+    assertNotDemo(req.user.userId);
     const data = await this.notificationService.updateSettings(
       req.user.userId,
       dto,

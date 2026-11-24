@@ -26,6 +26,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { assertNotDemo } from '../demoModule/demo.util';
 @ApiTags('Stripe')
 @Controller('stripe')
 export class StripeController {
@@ -118,6 +119,7 @@ export class StripeController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: UpgradeCheckoutDTO,
   ) {
+    assertNotDemo(req.user.userId);
     this.stripeService.assertOwner(req);
     const session = await this.stripeService.createUpgradeCheckout(
       req.user.userId,
@@ -311,6 +313,7 @@ export class StripeController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @Post('subscription/cancel')
   async cancel(@Req() req: AuthenticatedRequest) {
+    assertNotDemo(req.user.userId);
     this.stripeService.assertOwner(req);
     const data = await this.stripeService.setCancelAtPeriodEnd(
       req.user.userId,
@@ -356,6 +359,7 @@ export class StripeController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @Post('subscription/resume')
   async resume(@Req() req: AuthenticatedRequest) {
+    assertNotDemo(req.user.userId);
     this.stripeService.assertOwner(req);
     const data = await this.stripeService.setCancelAtPeriodEnd(
       req.user.userId,
@@ -403,6 +407,7 @@ export class StripeController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('billing/portal')
   async createBillingPortalSession(@Req() req: AuthenticatedRequest) {
+    assertNotDemo(req.user.userId);
     this.stripeService.assertOwner(req);
     const data = await this.stripeService.createBillingPortalSession(
       req.user.userId,

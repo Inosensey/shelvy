@@ -44,6 +44,7 @@ import type { AuthenticatedRequest } from 'src/types/request';
 import { AllowWithoutOrganization } from 'src/decorators/allowWithoutOrg.decorator';
 import { ChangePasswordDTO, UpdateProfileDTO } from './settings.dto';
 import { Throttle } from '@nestjs/throttler';
+import { assertNotDemo } from '../demoModule/demo.util';
 
 @ApiTags('users')
 @Controller('users')
@@ -403,6 +404,7 @@ export class UserController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: ChangePasswordDTO,
   ) {
+    assertNotDemo(req.user.userId);
     const token = req.cookies?.token as string;
     await this.userService.updatePassword(req.user.userId, token, dto);
     return ApiResponseShaper.success(
