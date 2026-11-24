@@ -22,6 +22,7 @@ import { APP_GUARD } from '@nestjs/core/constants';
 import { PlanModule } from './modules/planModule/plan.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SentryModule } from '@sentry/nestjs/setup';
+import { DemoModule } from './modules/demoModule/demo.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { SentryModule } from '@sentry/nestjs/setup';
     SocketGatewayModule,
     NotificationModule,
     PlanModule,
+    DemoModule,
   ],
   controllers: [AppController],
   providers: [
