@@ -20,7 +20,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Home",
+  title: {
+    default: "Shelvy",
+    template: "%s | Shelvy",
+  },
   description: "Shelvy - Inventory Management done easy.",
 };
 
