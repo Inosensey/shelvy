@@ -7,7 +7,7 @@ import { generateHistory } from './demo.history';
 
 const DAY = 86_400_000;
 const CHUNK = 500;
-const PLAN_AMOUNT = 9; // USD per month shown in the demo's billing history. Match your Premium price.
+const PLAN_AMOUNT = 299.99; // USD per month shown in the demo's billing history. Match your Premium price.
 
 const productId = (sku: string) => `demo-prod-${sku}`;
 const supplierId = (i: number) => `demo-sup-${i}`;
@@ -159,7 +159,7 @@ export class DemoService {
         await tx.subscriptionPaymentHistory.createMany({
           data: [1, 0].map((monthsAgo) => ({
             subscriptionId: sub.id,
-            amount: PLAN_AMOUNT * 100,
+            amount: Math.round(PLAN_AMOUNT * 100),
             currency: 'usd',
             status: 'COMPLETED' as const,
             periodStart: new Date(periodStart.getTime() - monthsAgo * 30 * DAY),
