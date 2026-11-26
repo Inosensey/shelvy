@@ -1,8 +1,12 @@
+
+
+
+
 # Shelvy
 
 Inventory management for small teams. Track products and suppliers, record every stock change in a ledger, let staff **request** changes that a manager **approves**, and get low-stock alerts in real time.
 
-**[Live demo](https://shelvy-inv.vercel.app)** (click *Owner*, *Manager* or *Staff* on the sign-in page, no sign-up needed) · **[API docs (Swagger)](https://shelvy.onrender.com/api/docs)** · **[Demo video](#)** <!-- TODO: add video link -->
+**[Live demo](https://shelvy-inv.vercel.app)** (click *Owner*, *Manager* or *Staff* on the sign-in page, no sign-up needed) · **[API docs (Swagger)](https://shelvy.onrender.com/api/docs)** · **[Demo video]([#](https://github.com/user-attachments/assets/2f279041-851c-44d7-9581-df797152b675))**
 
 ![Live updates across roles: staff submits a request, the manager is notified instantly and approves it](docs/live-updates.gif)
 
