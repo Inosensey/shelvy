@@ -222,7 +222,22 @@ export class ProductTrendPointDTO {
   stockAfter!: number;
 }
 
+export class SupplierSummaryDTO {
+  @ApiProperty({ example: 'sup_cmu29xace00004' })
+  @Expose()
+  id!: string;
+
+  @ApiProperty({ example: 'Nexus Computer Distribution' })
+  @Expose()
+  name!: string;
+}
+
 export class ProductDetailResponseDTO extends ProductResponseDTO {
+  @ApiProperty({ type: SupplierSummaryDTO, nullable: true })
+  @Expose()
+  @Type(() => SupplierSummaryDTO)
+  supplier!: SupplierSummaryDTO | null;
+
   @ApiProperty({ type: ProductStatsDTO })
   @Expose()
   @Type(() => ProductStatsDTO)
