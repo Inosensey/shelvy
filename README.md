@@ -1,7 +1,3 @@
-
-
-
-
 # Shelvy
 
 Inventory management for small teams. Track products and suppliers, record every stock change in a ledger, let staff **request** changes that a manager **approves**, and get low-stock alerts in real time.
@@ -192,10 +188,11 @@ Names only, set your own values. <!-- TODO: replace with the real list from your
 ## Roadmap
 
 - Concurrency test suite for stock movements
+- AI-generated product descriptions (Claude API)
 - CQRS for the heavier write paths
 - Bot protection on sign-up
 - Stripe live mode checklist
 
 ## License
 
-<!-- TODO: add a license, or "All rights reserved" -->
+MIT © 2026 Philip Mathew Dingcong. See [LICENSE](LICENSE).
