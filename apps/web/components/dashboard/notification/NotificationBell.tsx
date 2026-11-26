@@ -12,7 +12,7 @@ export function NotificationBell() {
   const { notifications, unreadCount, markAllReadLocally } = useNotifications();
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="sm:relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

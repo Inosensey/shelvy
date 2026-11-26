@@ -35,7 +35,7 @@ export function NotificationItem({ notification, onNavigate }: NotificationItemP
           {!notification.isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-clay" />}
           <p className="truncate text-sm font-medium text-linen">{notification.title}</p>
         </div>
-        <p className="mt-0.5 line-clamp-2 text-xs text-linen/50">{notification.message}</p>
+        <p className="mt-0.5 line-clamp-2 text-[13px] text-linen/60 sm:text-xs sm:text-linen/50">{notification.message}</p>
         <p className="mt-1 text-[11px] text-linen/35">
           {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
         </p>

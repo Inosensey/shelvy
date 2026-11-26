@@ -28,7 +28,7 @@ export function NotificationPanel({ open, notifications, onClose, onOpenMarkRead
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.15 }}
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-linen/10 bg-surface shadow-lg"
+          className="absolute inset-x-3 top-full z-50 mt-2 overflow-hidden rounded-xl border border-linen/10 bg-surface shadow-lg sm:left-auto sm:right-0 sm:w-96"
         >
           <div className="border-b border-linen/10 px-4 py-3">
             <h2 className="text-sm font-medium text-linen">Notifications</h2>
@@ -37,7 +37,7 @@ export function NotificationPanel({ open, notifications, onClose, onOpenMarkRead
           {notifications.length === 0 ? (
             <p className="px-4 py-8 text-center text-xs text-linen/40">You&apos;re all caught up.</p>
           ) : (
-            <div className="max-h-96 divide-y divide-linen/10 overflow-y-auto">
+            <div className="max-h-[70vh] divide-y divide-linen/10 overflow-y-auto sm:max-h-96">
               {notifications.map((n) => (
                 <NotificationItem key={n.id} notification={n} onNavigate={onClose} />
               ))}
